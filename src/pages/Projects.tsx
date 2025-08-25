@@ -29,56 +29,6 @@ const mockProjects = [
     dueDate: "2024-01-15",
     teamSize: 5,
     priority: "높음"
-  },
-  {
-    id: 2,
-    name: "모바일 앱 개발",
-    description: "크로스 플랫폼 모바일 애플리케이션",
-    status: "진행중",
-    progress: 40,
-    dueDate: "2024-02-28",
-    teamSize: 8,
-    priority: "중간"
-  },
-  {
-    id: 3,
-    name: "데이터베이스 최적화",
-    description: "시스템 성능 개선 및 DB 최적화",
-    status: "대기중",
-    progress: 20,
-    dueDate: "2024-01-30",
-    teamSize: 3,
-    priority: "높음"
-  },
-  {
-    id: 4,
-    name: "마케팅 캠페인",
-    description: "신제품 런칭 마케팅 전략 수립",
-    status: "완료",
-    progress: 100,
-    dueDate: "2023-12-20",
-    teamSize: 4,
-    priority: "중간"
-  },
-  {
-    id: 5,
-    name: "API 문서화",
-    description: "개발자를 위한 API 가이드 작성",
-    status: "진행중",
-    progress: 80,
-    dueDate: "2024-01-10",
-    teamSize: 2,
-    priority: "낮음"
-  },
-  {
-    id: 6,
-    name: "보안 강화",
-    description: "시스템 보안 점검 및 강화 작업",
-    status: "계획중",
-    progress: 5,
-    dueDate: "2024-03-15",
-    teamSize: 6,
-    priority: "높음"
   }
 ]
 
