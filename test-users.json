@@ -1,0 +1,52 @@
+{
+  "testUsers": [
+    {
+      "id": "31c3ebe1-c081-49b6-8ec2-a50a659d0d55",
+      "email": "test1@example.com",
+      "password": "password123",
+      "display_name": "김개발",
+      "full_name": "김개발",
+      "role": "개발자",
+      "description": "프론트엔드 개발 담당"
+    },
+    {
+      "id": "dac20ea3-1876-46fc-8d2b-cbc924a50c03",
+      "email": "test2@example.com",
+      "password": "password123",
+      "display_name": "이디자인",
+      "full_name": "이디자인",
+      "role": "디자이너",
+      "description": "UI/UX 디자인 담당"
+    },
+    {
+      "id": "8f3ffddf-a214-4a0f-8f08-91ceaab90817",
+      "email": "test3@example.com",
+      "password": "password123",
+      "display_name": "박기획",
+      "full_name": "박기획",
+      "role": "기획자",
+      "description": "서비스 기획 및 요구사항 분석"
+    },
+    {
+      "id": "f99b2781-3897-48b6-afb8-f06884203ce9",
+      "email": "test4@example.com",
+      "password": "password123",
+      "display_name": "최테스트",
+      "full_name": "최테스트",
+      "role": "테스터",
+      "description": "QA 및 테스트 담당"
+    },
+    {
+      "id": "63fb6fee-8c99-450b-8f95-c731e910b1a4",
+      "email": "test5@example.com",
+      "password": "password123",
+      "display_name": "정관리",
+      "full_name": "정관리",
+      "role": "프로젝트 매니저",
+      "description": "프로젝트 관리 및 일정 조율"
+    }
+  ],
+  "defaultPassword": "password123",
+  "createdAt": "2025-08-03",
+  "note": "모든 테스트 사용자의 비밀번호는 'password123'입니다."
+} 
