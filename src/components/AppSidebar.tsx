@@ -6,7 +6,8 @@ import {
   Calendar, 
   Settings,
   Plus,
-  LogOut
+  LogOut,
+  User
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
@@ -29,7 +30,7 @@ import { Button } from "@/components/ui/button"
 const mainItems = [
   { title: "대시보드", url: "/", icon: LayoutDashboard },
   { title: "프로젝트", url: "/projects", icon: FolderOpen },
-  { title: "팀", url: "/team", icon: Users },
+  { title: "조직 관리", url: "/team", icon: Users },
   { title: "캘린더", url: "/calendar", icon: Calendar },
 ]
 
@@ -127,6 +128,17 @@ export function AppSidebar() {
           <div className="text-xs text-muted-foreground">
             {user?.email}
           </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            asChild
+            className="w-full justify-start"
+          >
+            <NavLink to="/profile-edit">
+              <User className="mr-2 h-4 w-4" />
+              개인정보 수정
+            </NavLink>
+          </Button>
           <Button 
             variant="outline" 
             size="sm" 

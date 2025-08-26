@@ -9,44 +9,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Slider } from './ui/slider'
 import { ProjectService } from '@/services/projectService'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/useAuth'
 import type { Database } from '@/integrations/supabase/types'
 
 type Project = Database['public']['Tables']['projects']['Row']
 
-interface ProjectEditModalProps {
-  project: Project
+interface ProjectCreateModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (updatedProject: Project) => void
-  onMinimize?: () => void
+  onProjectCreated: (newProject: Project) => void
 }
 
-export function ProjectEditModal({ project, isOpen, onClose, onSave, onMinimize }: ProjectEditModalProps) {
-  // project가 null이면 모달을 렌더링하지 않음
-  if (!project) {
-    return null
-  }
-
-  // 디버깅: contract_date 값 확인
-  console.log('🔍 ProjectEditModal - project.contract_date:', project.contract_date)
-  console.log('🔍 ProjectEditModal - project.due_date:', project.due_date)
+export function ProjectCreateModal({ isOpen, onClose, onProjectCreated }: ProjectCreateModalProps) {
+  const { user, userProfile } = useAuth();
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState({
-    name: project.name,
-    description: project.description || '',
-    status: project.status,
-    contract_date: project.contract_date ? project.contract_date.split('T')[0] : '',
-    due_date: project.due_date ? project.due_date.split('T')[0] : '',
-    team_size: project.team_size || 1,
-    priority: project.priority,
-    progress: project.progress
+    name: '',
+    description: '',
+    status: '계약전',
+    contract_date: '',
+    estimate_amount: '',
+    estimate_note: '',
+    due_date: '',
+    team_size: 1,
+    priority: '중간',
+    progress: 0
   })
 
-  // 디버깅: formData 초기화 확인
-  console.log('🔍 ProjectEditModal - formData 초기화:', formData)
-  
   const [isLoading, setIsLoading] = useState(false)
-  const { toast } = useToast()
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
@@ -55,38 +46,64 @@ export function ProjectEditModal({ project, isOpen, onClose, onSave, onMinimize 
     }))
   }
 
-  const handleSave = async () => {
+  const handleCreate = async () => {
+    if (!user) {
+      toast({
+        title: "오류",
+        description: "로그인이 필요합니다.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!formData.name.trim()) {
+      toast({
+        title: "오류",
+        description: "프로젝트명을 입력해주세요.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
     try {
-      await ProjectService.updateProject(project.id, {
+      const newProject = await ProjectService.createProject({
         ...formData,
         contract_date: formData.contract_date || null,
+        estimate_amount: formData.estimate_amount || null,
+        estimate_note: formData.estimate_note || null,
         due_date: formData.due_date || null,
         team_size: formData.team_size,
-        progress: formData.progress
+        progress: formData.progress,
+        created_by: user?.id || '',
+        created_by_name: userProfile?.display_name || '알 수 없음'
       })
       
       toast({
         title: "성공",
-        description: "프로젝트가 성공적으로 수정되었습니다.",
+        description: "프로젝트가 성공적으로 생성되었습니다.",
       })
       
-      // 수정된 데이터로 새로운 프로젝트 객체 생성
-      const updatedProject = {
-        ...project,
-        ...formData,
-        contract_date: formData.contract_date || null,
-        due_date: formData.due_date || null,
-        team_size: formData.team_size,
-        progress: formData.progress
-      }
-      
-      onSave(updatedProject)
+      onProjectCreated(newProject)
       onClose()
+      
+      // 폼 초기화
+      setFormData({
+        name: '',
+        description: '',
+        status: '계약전',
+        contract_date: '',
+        estimate_amount: '',
+        estimate_note: '',
+        due_date: '',
+        team_size: 1,
+        priority: '중간',
+        progress: 0
+      })
     } catch (error) {
       toast({
         title: "오류",
-        description: "프로젝트 수정에 실패했습니다.",
+        description: "프로젝트 생성에 실패했습니다.",
         variant: "destructive",
       })
     } finally {
@@ -96,25 +113,25 @@ export function ProjectEditModal({ project, isOpen, onClose, onSave, onMinimize 
 
   return (
     <Modal
-      title="프로젝트 편집"
+      title="새 프로젝트 생성"
       isOpen={isOpen}
       onClose={onClose}
-      onConfirm={handleSave}
+      onConfirm={handleCreate}
       onCancel={onClose}
-      confirmText={isLoading ? '저장 중...' : '확인'}
+      confirmText={isLoading ? '생성 중...' : '생성'}
       cancelText="취소"
       size="lg"
-      onMinimize={onMinimize}
     >
       <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-2">
         {/* 프로젝트명 */}
         <div>
-          <Label htmlFor="name">프로젝트명</Label>
+          <Label htmlFor="name">프로젝트명 *</Label>
           <Input
             id="name"
             value={formData.name}
             onChange={(e) => handleInputChange('name', e.target.value)}
             disabled={isLoading}
+            placeholder="프로젝트명을 입력하세요"
           />
         </div>
 
@@ -127,6 +144,7 @@ export function ProjectEditModal({ project, isOpen, onClose, onSave, onMinimize 
             onChange={(e) => handleInputChange('description', e.target.value)}
             disabled={isLoading}
             rows={3}
+            placeholder="프로젝트에 대한 설명을 입력하세요"
           />
         </div>
 
@@ -138,7 +156,7 @@ export function ProjectEditModal({ project, isOpen, onClose, onSave, onMinimize 
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="계획중">계획중</SelectItem>
+              <SelectItem value="계약전">계약전</SelectItem>
               <SelectItem value="진행중">진행중</SelectItem>
               <SelectItem value="완료">완료</SelectItem>
               <SelectItem value="보류">보류</SelectItem>
@@ -152,9 +170,37 @@ export function ProjectEditModal({ project, isOpen, onClose, onSave, onMinimize 
           <Input
             id="contract_date"
             type="date"
-            value={formData.contract_date || ''}
+            value={formData.contract_date}
             onChange={(e) => handleInputChange('contract_date', e.target.value)}
             disabled={isLoading}
+          />
+        </div>
+
+        {/* 견적 금액 */}
+        <div>
+          <Label htmlFor="estimate_amount">견적 금액</Label>
+          <Input
+            id="estimate_amount"
+            type="number"
+            min="0"
+            step="1000"
+            value={formData.estimate_amount}
+            onChange={(e) => handleInputChange('estimate_amount', e.target.value)}
+            disabled={isLoading}
+            placeholder="견적 금액을 입력하세요 (원)"
+          />
+        </div>
+
+        {/* 견적 비고 */}
+        <div>
+          <Label htmlFor="estimate_note">견적 비고</Label>
+          <Textarea
+            id="estimate_note"
+            value={formData.estimate_note}
+            onChange={(e) => handleInputChange('estimate_note', e.target.value)}
+            disabled={isLoading}
+            rows={2}
+            placeholder="견적에 대한 추가 정보를 입력하세요"
           />
         </div>
 
@@ -211,6 +257,8 @@ export function ProjectEditModal({ project, isOpen, onClose, onSave, onMinimize 
             </SelectContent>
           </Select>
         </div>
+
+
       </div>
     </Modal>
   )

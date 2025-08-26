@@ -21,6 +21,7 @@ export type Database = {
           display_name: string | null
           email: string | null
           id: string
+          phone: string | null
           updated_at: string
           user_id: string
         }
@@ -30,6 +31,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          phone?: string | null
           updated_at?: string
           user_id: string
         }
@@ -39,29 +41,168 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          phone?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: []
-      }
+      },
+      groups: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          parent_group_id: string | null
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          parent_group_id?: string | null
+          created_by: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          parent_group_id?: string | null
+          created_by?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "groups_created_by_fkey"
+            columns: ["created_by"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "groups_parent_group_id_fkey"
+            columns: ["parent_group_id"]
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
+      group_members: {
+        Row: {
+          id: string
+          group_id: string
+          user_id: string
+          role: 'admin' | 'member'
+          status: 'active' | 'inactive' | 'pending' | 'suspended'
+          joined_at: string
+        }
+        Insert: {
+          id?: string
+          group_id: string
+          user_id: string
+          role?: string
+          status?: 'active' | 'inactive' | 'pending' | 'suspended'
+          joined_at?: string
+        }
+        Update: {
+          id?: string
+          group_id?: string
+          user_id?: string
+          role?: string
+          status?: 'active' | 'inactive' | 'pending' | 'suspended'
+          joined_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
+      group_join_requests: {
+        Row: {
+          id: string
+          group_id: string
+          user_id: string
+          status: string
+          message: string | null
+          created_at: string
+          updated_at: string
+          reviewed_by: string | null
+          reviewed_at: string | null
+        }
+        Insert: {
+          id?: string
+          group_id: string
+          user_id: string
+          status?: string
+          message?: string | null
+          created_at?: string
+          updated_at?: string
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+        }
+        Update: {
+          id?: string
+          group_id?: string
+          user_id?: string
+          status?: string
+          message?: string | null
+          created_at?: string
+          updated_at?: string
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_join_requests_group_id_fkey"
+            columns: ["group_id"]
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_join_requests_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_join_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
       projects: {
         Row: {
           id: string; // Changed from number to string for UUID
           name: string; description: string | null; status: string; progress: number;
-          contract_date: string | null; due_date: string | null; team_size: number | null; priority: string;
-          created_by: string; created_at: string; updated_at: string;
+          contract_date: string | null; estimate_amount: string | null; estimate_note: string | null; due_date: string | null; team_size: number | null; priority: string;
+          created_by: string; created_by_name: string; created_at: string; updated_at: string;
         };
         Insert: {
           id?: string; // Changed from number to string for UUID
           name: string; description?: string | null; status?: string; progress?: number;
-          contract_date?: string | null; due_date?: string | null; team_size?: number | null; priority?: string;
-          created_by: string; created_at?: string; updated_at?: string;
+          contract_date?: string | null; estimate_amount?: string | null; estimate_note?: string | null; due_date?: string | null; team_size?: number | null; priority?: string;
+          created_by: string; created_by_name: string; created_at?: string; updated_at?: string;
         };
         Update: {
           id?: string; // Changed from number to string for UUID
           name?: string; description?: string | null; status?: string; progress?: number;
-          contract_date?: string | null; due_date?: string | null; team_size?: number | null; priority?: string;
-          created_by?: string; created_at?: string; updated_at?: string;
+          contract_date?: string | null; estimate_amount?: string | null; estimate_note?: string | null; due_date?: string | null; team_size?: number | null; priority?: string;
+          created_by?: string; created_by_name?: string; created_at?: string; updated_at?: string;
         };
         Relationships: [
           {
@@ -71,7 +212,7 @@ export type Database = {
             referencedColumns: ["id"]
           }
         ]
-      }
+      },
     }
     Views: {
       [_ in never]: never

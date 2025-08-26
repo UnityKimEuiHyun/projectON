@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
@@ -21,13 +22,22 @@ export default function Auth() {
     setLoading(true);
     setError("");
 
+    if (!displayName.trim()) {
+      setError("사용자 이름을 입력해주세요.");
+      setLoading(false);
+      return;
+    }
+
     const redirectUrl = `${window.location.origin}/`;
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl
+        emailRedirectTo: redirectUrl,
+        data: {
+          display_name: displayName
+        }
       }
     });
 
@@ -38,6 +48,23 @@ export default function Auth() {
         setError(error.message);
       }
     } else {
+      // 사용자 프로필 생성
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              user_id: data.user.id,
+              display_name: displayName,
+              email: email
+            }
+          ]);
+
+        if (profileError) {
+          console.error('프로필 생성 오류:', profileError);
+        }
+      }
+
       setError("");
       alert("회원가입 성공! 이메일을 확인해주세요.");
     }
@@ -121,6 +148,18 @@ export default function Auth() {
             
             <TabsContent value="signup">
               <form onSubmit={signUp} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-display-name">사용자 이름</Label>
+                  <Input
+                    id="signup-display-name"
+                    type="text"
+                    placeholder="홍길동"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    required
+                    minLength={2}
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">이메일</Label>
                   <Input

@@ -9,7 +9,7 @@ import {
   Search, 
   Calendar, 
   Users, 
-  MoreVertical,
+  Trash2,
   Filter,
   Loader2
 } from "lucide-react"
@@ -19,7 +19,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ProjectEditModal } from "@/components/ProjectEditModal"
+import { ProjectDetailModal } from "@/components/ProjectDetailModal"
+import { ProjectCreateModal } from "@/components/ProjectCreateModal"
 import { ProjectService } from "@/services/projectService"
 import { useToast } from "@/hooks/use-toast"
 
@@ -33,9 +34,10 @@ const Projects = () => {
   const [filter, setFilter] = useState("전체")
   const [projects, setProjects] = useState<Project[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [editingProject, setEditingProject] = useState<Project | null>(null)
-  const [isModalMinimized, setIsModalMinimized] = useState(false)
+
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [viewingProject, setViewingProject] = useState<Project | null>(null)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
   // 프로젝트 목록 불러오기
   const loadProjects = async () => {
@@ -54,30 +56,9 @@ const Projects = () => {
       } catch (dbError) {
         console.error('❌ DB 연결 실패:', dbError)
         
-        // DB 연결 실패 시 mock 데이터 사용
-        const mockProjects: Project[] = [
-          {
-            id: "mock-1",
-            name: "웹사이트 리뉴얼",
-            description: "회사 홈페이지 전면 리뉴얼 프로젝트",
-            status: "진행중",
-            progress: 65,
-            contract_date: null,
-            due_date: "2024-01-15",
-            team_size: 5,
-            priority: "높음",
-            created_by: "mock-user",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ]
-        
-        setProjects(mockProjects)
-        console.log('🔄 Mock 데이터로 대체:', mockProjects)
-        
         toast({
           title: "DB 연결 실패",
-          description: "임시 데이터를 표시합니다. DB 설정을 확인해주세요.",
+          description: "프로젝트 목록을 불러오는데 실패했습니다. DB 설정을 확인해주세요.",
           variant: "destructive"
         })
       }
@@ -138,25 +119,63 @@ const Projects = () => {
   })
 
   const handleEditProject = (project: Project) => {
-    setEditingProject(project)
-    setIsEditModalOpen(true)
+    setViewingProject(project)
+    setIsDetailModalOpen(true)
   }
 
-  const handleSaveProject = (updatedProject: Project) => {
-    console.log('🔍 handleSaveProject - 수정된 프로젝트:', updatedProject)
-    console.log('🔍 handleSaveProject - contract_date:', updatedProject.contract_date)
-    
+  const handleProjectUpdated = (updatedProject: Project) => {
     setProjects(prev => 
       prev.map(p => p.id === updatedProject.id ? updatedProject : p)
     )
-    setIsEditModalOpen(false)
-    setEditingProject(null)
+    toast({
+      title: "성공",
+      description: "프로젝트가 성공적으로 수정되었습니다.",
+    })
   }
 
-  const handleCloseEditModal = () => {
-    setIsEditModalOpen(false)
-    setEditingProject(null)
-    setIsModalMinimized(false)
+  const handleViewProject = (project: Project) => {
+    setViewingProject(project)
+    setIsDetailModalOpen(true)
+  }
+
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false)
+    setViewingProject(null)
+  }
+
+  const handleCreateProject = () => {
+    setIsCreateModalOpen(true)
+  }
+
+  const handleCloseCreateModal = () => {
+    setIsCreateModalOpen(false)
+  }
+
+  const handleProjectCreated = (newProject: Project) => {
+    setProjects(prev => [newProject, ...prev])
+    toast({
+      title: "성공",
+      description: "새 프로젝트가 생성되었습니다.",
+    })
+  }
+
+  const handleDeleteProject = async (project: Project) => {
+    if (window.confirm(`"${project.name}" 프로젝트를 정말 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) {
+      try {
+        await ProjectService.deleteProject(project.id)
+        setProjects(prev => prev.filter(p => p.id !== project.id))
+        toast({
+          title: "성공",
+          description: "프로젝트가 성공적으로 삭제되었습니다.",
+        })
+      } catch (error) {
+        toast({
+          title: "오류",
+          description: "프로젝트 삭제에 실패했습니다.",
+          variant: "destructive",
+        })
+      }
+    }
   }
 
   if (isLoading) {
@@ -178,10 +197,10 @@ const Projects = () => {
           <h1 className="text-3xl font-bold">프로젝트</h1>
           <p className="text-muted-foreground">모든 프로젝트를 관리하고 추적하세요</p>
         </div>
-        <Button>
-          <Plus className="w-4 h-4 mr-2" />
-          새 프로젝트
-        </Button>
+                 <Button onClick={handleCreateProject}>
+           <Plus className="w-4 h-4 mr-2" />
+           새 프로젝트
+         </Button>
       </div>
 
       {/* Search and Filter */}
@@ -224,20 +243,15 @@ const Projects = () => {
                     {project.description}
                   </CardDescription>
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleEditProject(project)}>
-                      편집
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>복제</DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-600">삭제</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => handleDeleteProject(project)}
+                  title="프로젝트 삭제"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
               <div className="flex items-center justify-between">
                 {getStatusBadge(project.status)}
@@ -258,7 +272,7 @@ const Projects = () => {
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <div className="flex items-center">
                   <Calendar className="w-4 h-4 mr-1" />
-                  {project.due_date ? new Date(project.due_date).toLocaleDateString('ko-KR') : '미정'}
+                  종료일: {project.due_date ? new Date(project.due_date).toLocaleDateString('ko-KR') : '미정'}
                 </div>
                 <div className="flex items-center">
                   <Users className="w-4 h-4 mr-1" />
@@ -266,7 +280,11 @@ const Projects = () => {
                 </div>
               </div>
               
-              <Button variant="outline" className="w-full">
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => handleViewProject(project)}
+              >
                 프로젝트 보기
               </Button>
             </CardContent>
@@ -284,13 +302,19 @@ const Projects = () => {
         </div>
       )}
 
-      {/* Project Edit Modal */}
-      <ProjectEditModal
-        isOpen={isEditModalOpen}
-        onClose={handleCloseEditModal}
-        onSave={handleSaveProject}
-        project={editingProject}
-        onMinimize={() => setIsModalMinimized(true)}
+      {/* Project Detail Modal */}
+      <ProjectDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={handleCloseDetailModal}
+        project={viewingProject}
+        onProjectUpdated={handleProjectUpdated}
+      />
+
+      {/* Project Create Modal */}
+      <ProjectCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={handleCloseCreateModal}
+        onProjectCreated={handleProjectCreated}
       />
     </div>
   )

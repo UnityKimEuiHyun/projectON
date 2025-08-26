@@ -7,14 +7,11 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   base: "/",
   server: {
-    host: "::",
-    port: 8080,
+    host: "127.0.0.1",
+    port: 3001,
   },
   plugins: [
-    react({
-      // React Strict Mode 비활성화하여 Static Flag 경고 해결
-      jsxRuntime: 'automatic'
-    }),
+    react(),
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),
