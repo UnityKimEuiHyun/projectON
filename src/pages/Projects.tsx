@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,8 @@ import {
   Calendar, 
   Users, 
   MoreVertical,
-  Filter
+  Filter,
+  Loader2
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -18,23 +19,85 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ProjectEditModal } from "@/components/ProjectEditModal"
+import { ProjectService } from "@/services/projectService"
+import { useToast } from "@/hooks/use-toast"
 
-const mockProjects = [
-  {
-    id: 1,
-    name: "웹사이트 리뉴얼",
-    description: "회사 홈페이지 전면 리뉴얼 프로젝트",
-    status: "진행중",
-    progress: 65,
-    dueDate: "2024-01-15",
-    teamSize: 5,
-    priority: "높음"
-  }
-]
+import type { Database } from '@/integrations/supabase/types'
+
+type Project = Database['public']['Tables']['projects']['Row']
 
 const Projects = () => {
+  const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
   const [filter, setFilter] = useState("전체")
+  const [projects, setProjects] = useState<Project[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [isModalMinimized, setIsModalMinimized] = useState(false)
+
+  // 프로젝트 목록 불러오기
+  const loadProjects = async () => {
+    try {
+      setIsLoading(true)
+      
+      // DB 연결 테스트
+      console.log('🔍 DB 연결 테스트 시작...')
+      
+      try {
+        const dbProjects = await ProjectService.getProjects()
+        console.log('✅ DB 연결 성공:', dbProjects)
+        
+        setProjects(dbProjects)
+        console.log('📊 프로젝트 데이터 설정 완료:', dbProjects)
+      } catch (dbError) {
+        console.error('❌ DB 연결 실패:', dbError)
+        
+        // DB 연결 실패 시 mock 데이터 사용
+        const mockProjects: Project[] = [
+          {
+            id: "mock-1",
+            name: "웹사이트 리뉴얼",
+            description: "회사 홈페이지 전면 리뉴얼 프로젝트",
+            status: "진행중",
+            progress: 65,
+            contract_date: null,
+            due_date: "2024-01-15",
+            team_size: 5,
+            priority: "높음",
+            created_by: "mock-user",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ]
+        
+        setProjects(mockProjects)
+        console.log('🔄 Mock 데이터로 대체:', mockProjects)
+        
+        toast({
+          title: "DB 연결 실패",
+          description: "임시 데이터를 표시합니다. DB 설정을 확인해주세요.",
+          variant: "destructive"
+        })
+      }
+      
+    } catch (error) {
+      console.error('❌ 전체 로딩 실패:', error)
+      toast({
+        title: "오류",
+        description: "프로젝트 목록을 불러오는데 실패했습니다.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // 컴포넌트 마운트 시 프로젝트 목록 로드
+  useEffect(() => {
+    loadProjects()
+  }, [])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -64,12 +127,48 @@ const Projects = () => {
     }
   }
 
-  const filteredProjects = mockProjects.filter(project => {
+  const filteredProjects = projects.filter(project => {
+    // project가 undefined인 경우 필터링
+    if (!project) return false
+    
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.description.toLowerCase().includes(searchTerm.toLowerCase())
+                         (project.description && project.description.toLowerCase().includes(searchTerm.toLowerCase()))
     const matchesFilter = filter === "전체" || project.status === filter
     return matchesSearch && matchesFilter
   })
+
+  const handleEditProject = (project: Project) => {
+    setEditingProject(project)
+    setIsEditModalOpen(true)
+  }
+
+  const handleSaveProject = (updatedProject: Project) => {
+    console.log('🔍 handleSaveProject - 수정된 프로젝트:', updatedProject)
+    console.log('🔍 handleSaveProject - contract_date:', updatedProject.contract_date)
+    
+    setProjects(prev => 
+      prev.map(p => p.id === updatedProject.id ? updatedProject : p)
+    )
+    setIsEditModalOpen(false)
+    setEditingProject(null)
+  }
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false)
+    setEditingProject(null)
+    setIsModalMinimized(false)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span className="text-lg">프로젝트 목록을 불러오는 중...</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -132,7 +231,9 @@ const Projects = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>편집</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleEditProject(project)}>
+                      편집
+                    </DropdownMenuItem>
                     <DropdownMenuItem>복제</DropdownMenuItem>
                     <DropdownMenuItem className="text-red-600">삭제</DropdownMenuItem>
                   </DropdownMenuContent>
@@ -157,11 +258,11 @@ const Projects = () => {
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <div className="flex items-center">
                   <Calendar className="w-4 h-4 mr-1" />
-                  {new Date(project.dueDate).toLocaleDateString('ko-KR')}
+                  {project.due_date ? new Date(project.due_date).toLocaleDateString('ko-KR') : '미정'}
                 </div>
                 <div className="flex items-center">
                   <Users className="w-4 h-4 mr-1" />
-                  {project.teamSize}명
+                  {project.team_size}명
                 </div>
               </div>
               
@@ -175,9 +276,22 @@ const Projects = () => {
 
       {filteredProjects.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-muted-foreground">검색 조건에 맞는 프로젝트가 없습니다.</p>
+          <p className="text-muted-foreground">
+            {searchTerm || filter !== "전체" 
+              ? "검색 조건에 맞는 프로젝트가 없습니다." 
+              : "등록된 프로젝트가 없습니다."}
+          </p>
         </div>
       )}
+
+      {/* Project Edit Modal */}
+      <ProjectEditModal
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+        onSave={handleSaveProject}
+        project={editingProject}
+        onMinimize={() => setIsModalMinimized(true)}
+      />
     </div>
   )
 }

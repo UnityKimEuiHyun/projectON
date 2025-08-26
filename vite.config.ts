@@ -11,7 +11,10 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   plugins: [
-    react(),
+    react({
+      // React Strict Mode 비활성화하여 Static Flag 경고 해결
+      jsxRuntime: 'automatic'
+    }),
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),

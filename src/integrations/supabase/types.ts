@@ -44,6 +44,34 @@ export type Database = {
         }
         Relationships: []
       }
+      projects: {
+        Row: {
+          id: string; // Changed from number to string for UUID
+          name: string; description: string | null; status: string; progress: number;
+          contract_date: string | null; due_date: string | null; team_size: number | null; priority: string;
+          created_by: string; created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; // Changed from number to string for UUID
+          name: string; description?: string | null; status?: string; progress?: number;
+          contract_date?: string | null; due_date?: string | null; team_size?: number | null; priority?: string;
+          created_by: string; created_at?: string; updated_at?: string;
+        };
+        Update: {
+          id?: string; // Changed from number to string for UUID
+          name?: string; description?: string | null; status?: string; progress?: number;
+          contract_date?: string | null; due_date?: string | null; team_size?: number | null; priority?: string;
+          created_by?: string; created_at?: string; updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "projects_created_by_fkey"
+            columns: ["created_by"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
