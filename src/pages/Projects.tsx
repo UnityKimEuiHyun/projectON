@@ -23,17 +23,24 @@ import { ProjectDetailModal } from "@/components/ProjectDetailModal"
 import { ProjectCreateModal } from "@/components/ProjectCreateModal"
 import { ProjectService } from "@/services/projectService"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/hooks/useAuth"
+import { supabase } from "@/integrations/supabase/client"
 
 import type { Database } from '@/integrations/supabase/types'
 
 type Project = Database['public']['Tables']['projects']['Row']
+type Group = Database['public']['Tables']['groups']['Row']
+type GroupMember = Database['public']['Tables']['group_members']['Row']
 
 const Projects = () => {
   const { toast } = useToast()
+  const { user, userProfile } = useAuth()
   const [searchTerm, setSearchTerm] = useState("")
   const [filter, setFilter] = useState("전체")
   const [projects, setProjects] = useState<Project[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [userAuthority, setUserAuthority] = useState<string | null>(null)
+  const [userGroups, setUserGroups] = useState<{ [groupId: string]: any }>({})
 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [viewingProject, setViewingProject] = useState<Project | null>(null)
@@ -79,6 +86,51 @@ const Projects = () => {
   useEffect(() => {
     loadProjects()
   }, [])
+
+  // 사용자 권한과 소속 기업 정보 로드
+  useEffect(() => {
+    if (user) {
+      loadUserPermissions()
+    }
+  }, [user])
+
+  const loadUserPermissions = async () => {
+    if (!user) return
+
+    try {
+      // 1. 사용자 권한 조회
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('authority')
+        .eq('user_id', user.id)
+        .single()
+
+      if (!profileError && profile) {
+        setUserAuthority(profile.authority)
+      }
+
+      // 2. 사용자가 소속된 기업 정보 조회
+      const { data: groupMembers, error: groupError } = await supabase
+        .from('group_members')
+        .select(`
+          group_id,
+          role,
+          status
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+
+      if (!groupError && groupMembers) {
+        const groupsMap: { [groupId: string]: any } = {}
+        groupMembers.forEach(member => {
+          groupsMap[member.group_id] = member
+        })
+        setUserGroups(groupsMap)
+      }
+    } catch (error) {
+      console.error('사용자 권한 로드 중 오류:', error)
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -157,6 +209,25 @@ const Projects = () => {
       title: "성공",
       description: "새 프로젝트가 생성되었습니다.",
     })
+  }
+
+  // 프로젝트 삭제 권한 확인
+  const canDeleteProject = (project: Project): boolean => {
+    if (!user) return false
+    
+    // 1. 'owner' 권한을 가진 사용자는 모든 프로젝트 삭제 가능
+    if (userAuthority === 'owner') return true
+    
+    // 2. 프로젝트 생성자는 자신의 프로젝트 삭제 가능
+    if (project.created_by === user.id) return true
+    
+    // 3. 프로젝트가 할당된 기업의 관리자인 경우 삭제 가능
+    if (project.group_id && userGroups[project.group_id]) {
+      const groupMember = userGroups[project.group_id]
+      if (groupMember.role === 'admin') return true
+    }
+    
+    return false
   }
 
   const handleDeleteProject = async (project: Project) => {
@@ -243,15 +314,17 @@ const Projects = () => {
                     {project.description}
                   </CardDescription>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                  onClick={() => handleDeleteProject(project)}
-                  title="프로젝트 삭제"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {canDeleteProject(project) && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => handleDeleteProject(project)}
+                    title="프로젝트 삭제"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
               <div className="flex items-center justify-between">
                 {getStatusBadge(project.status)}

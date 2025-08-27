@@ -34,12 +34,13 @@ export function ProjectCreateModal({ isOpen, onClose, onProjectCreated }: Projec
     due_date: '',
     team_size: 1,
     priority: '중간',
-    progress: 0
+    progress: 0,
+    group_id: '' as string | null
   })
 
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleInputChange = (field: string, value: string | number) => {
+  const handleInputChange = (field: string, value: string | number | null) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -75,6 +76,7 @@ export function ProjectCreateModal({ isOpen, onClose, onProjectCreated }: Projec
         due_date: formData.due_date || null,
         team_size: formData.team_size,
         progress: formData.progress,
+        group_id: formData.group_id || null,
         created_by: user?.id || '',
         created_by_name: userProfile?.display_name || '알 수 없음'
       })
@@ -98,7 +100,8 @@ export function ProjectCreateModal({ isOpen, onClose, onProjectCreated }: Projec
         due_date: '',
         team_size: 1,
         priority: '중간',
-        progress: 0
+        progress: 0,
+        group_id: '' as string | null
       })
     } catch (error) {
       toast({
@@ -256,6 +259,36 @@ export function ProjectCreateModal({ isOpen, onClose, onProjectCreated }: Projec
               <SelectItem value="긴급">긴급</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        {/* 기업 할당 */}
+        <div>
+          <Label htmlFor="group_id">기업 할당 (선택사항)</Label>
+          <Input
+            id="group_id"
+            value={formData.group_id || ''}
+            onChange={(e) => handleInputChange('group_id', e.target.value)}
+            disabled={isLoading}
+            placeholder="기업 ID를 입력하세요 (예: d2a146c8-09ef-4add-bc8b-5e14643c326e)"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            기업 ID를 입력하면 해당 기업에 프로젝트가 할당됩니다. 비워두면 개인 프로젝트로 생성됩니다.
+          </p>
+        </div>
+
+        {/* 기업 할당 */}
+        <div>
+          <Label htmlFor="group_id">기업 할당 (선택사항)</Label>
+          <Input
+            id="group_id"
+            value={formData.group_id || ''}
+            onChange={(e) => handleInputChange('group_id', e.target.value)}
+            disabled={isLoading}
+            placeholder="기업 ID를 입력하세요 (예: d2a146c8-09ef-4add-bc8b-5e14643c326e)"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            기업 ID를 입력하면 해당 기업에 프로젝트가 할당됩니다. 비워두면 개인 프로젝트로 생성됩니다.
+          </p>
         </div>
 
 

@@ -11,9 +11,13 @@ import { Slider } from './ui/slider'
 import { Calendar, Users, User, Clock, Target, FileText, Building, Edit, Save, X } from 'lucide-react'
 import { ProjectService } from '@/services/projectService'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/useAuth'
+import { supabase } from '@/integrations/supabase/client'
 import type { Database } from '@/integrations/supabase/types'
 
 type Project = Database['public']['Tables']['projects']['Row']
+type Group = Database['public']['Tables']['groups']['Row']
+type GroupMember = Database['public']['Tables']['group_members']['Row']
 
 interface ProjectDetailModalProps {
   project: Project | null
@@ -24,8 +28,11 @@ interface ProjectDetailModalProps {
 
 export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated }: ProjectDetailModalProps) {
   const { toast } = useToast()
+  const { user, userProfile } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [userAuthority, setUserAuthority] = useState<string | null>(null)
+  const [userGroups, setUserGroups] = useState<{ [groupId: string]: any }>({})
 
   // 모달이 닫힐 때 편집 모드 초기화
   const handleClose = () => {
@@ -64,13 +71,100 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
     }
   }, [project])
 
+  // 사용자 권한과 소속 기업 정보 로드
+  useEffect(() => {
+    if (isOpen && user) {
+      loadUserPermissions()
+    }
+  }, [isOpen, user])
+
+  // 프로젝트 팀 구성원 로드
+  useEffect(() => {
+    if (isOpen && project) {
+      loadTeamMembers()
+    }
+  }, [isOpen, project])
+
   if (!project) return null
+
+  const loadTeamMembers = async () => {
+    if (!project) return
+    
+    setIsLoadingTeam(true)
+    try {
+      // 프로젝트에 할당된 팀 구성원 조회
+      // TODO: 실제 프로젝트 팀 구성원 테이블이 있다면 여기서 조회
+      // 현재는 빈 배열로 설정
+      setTeamMembers([])
+    } catch (error) {
+      console.error('팀 구성원 로드 중 오류:', error)
+    } finally {
+      setIsLoadingTeam(false)
+    }
+  }
+
+  const loadUserPermissions = async () => {
+    if (!user) return
+
+    try {
+      // 1. 사용자 권한 조회
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('authority')
+        .eq('user_id', user.id)
+        .single()
+
+      if (!profileError && profile) {
+        setUserAuthority(profile.authority)
+      }
+
+      // 2. 사용자가 소속된 기업 정보 조회
+      const { data: groupMembers, error: groupError } = await supabase
+        .from('group_members')
+        .select(`
+          group_id,
+          role,
+          status
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+
+      if (!groupError && groupMembers) {
+        const groupsMap: { [groupId: string]: any } = {}
+        groupMembers.forEach(member => {
+          groupsMap[member.group_id] = member
+        })
+        setUserGroups(groupsMap)
+      }
+    } catch (error) {
+      console.error('사용자 권한 로드 중 오류:', error)
+    }
+  }
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }))
+  }
+
+  // 프로젝트 편집 권한 확인
+  const canEditProject = (project: Project): boolean => {
+    if (!user) return false
+    
+    // 1. 'owner' 권한을 가진 사용자는 모든 프로젝트 편집 가능
+    if (userAuthority === 'owner') return true
+    
+    // 2. 프로젝트 생성자는 자신의 프로젝트 편집 가능
+    if (project.created_by === user.id) return true
+    
+    // 3. 프로젝트가 할당된 기업의 관리자인 경우 편집 가능
+    if (project.group_id && userGroups[project.group_id]) {
+      const groupMember = userGroups[project.group_id]
+      if (groupMember.role === 'admin') return true
+    }
+    
+    return false
   }
 
   const handleSave = async () => {
@@ -140,6 +234,17 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
     setIsEditing(false)
   }
 
+  // 팀원 추가
+  const handleAddTeamMembers = (selectedMembers: any[]) => {
+    setTeamMembers(prev => [...prev, ...selectedMembers])
+    setIsAddMemberModalOpen(false)
+  }
+
+  // 팀원 제거
+  const handleRemoveTeamMember = (memberId: string) => {
+    setTeamMembers(prev => prev.filter(member => member.id !== memberId))
+  }
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "진행중":
@@ -168,22 +273,19 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
     }
   }
 
-  // Mock 팀 멤버 데이터 (실제로는 DB에서 가져와야 함)
-  const teamMembers = [
-    { id: 1, name: "김철수", role: "프로젝트 매니저", email: "kim@example.com" },
-    { id: 2, name: "이영희", role: "개발자", email: "lee@example.com" },
-    { id: 3, name: "박민수", role: "디자이너", email: "park@example.com" },
-    { id: 4, name: "정수진", role: "QA 엔지니어", email: "jung@example.com" },
-    { id: 5, name: "최동현", role: "개발자", email: "choi@example.com" },
-  ].slice(0, project?.team_size || 1)
+  // 실제 팀 구성원 데이터
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [isLoadingTeam, setIsLoadingTeam] = useState(false)
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false)
 
   return (
-    <Modal
-      title="프로젝트 상세 정보"
-      isOpen={isOpen}
-      onClose={handleClose}
-      size="xl"
-    >
+    <>
+      <Modal
+        title="프로젝트 상세 정보"
+        isOpen={isOpen}
+        onClose={handleClose}
+        size="xl"
+      >
       <div className="max-h-[75vh] overflow-y-auto space-y-6 pr-2">
         {/* 프로젝트 기본 정보 */}
         <div className="space-y-4">
@@ -440,38 +542,56 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
               팀 구성
             </h3>
             {isEditing && (
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="team_size" className="text-sm font-medium">팀 크기</Label>
-                <Input
-                  id="team_size"
-                  type="number"
-                  min="1"
-                  value={formData.team_size}
-                  onChange={(e) => handleInputChange('team_size', parseInt(e.target.value))}
-                  disabled={isLoading}
-                  className="w-20"
-                />
-                <span className="text-sm text-muted-foreground">명</span>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAddMemberModalOpen(true)}
+                disabled={isLoading}
+              >
+                <Users className="w-4 h-4 mr-2" />
+                팀원 추가
+              </Button>
             )}
           </div>
-          {!isEditing && (
-            <h4 className="text-sm text-muted-foreground">({project.team_size}명)</h4>
+          
+          {isLoadingTeam ? (
+            <div className="text-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+              <p className="text-sm text-muted-foreground mt-2">팀 구성원을 불러오는 중...</p>
+            </div>
+          ) : teamMembers.length === 0 ? (
+            <div className="text-center py-8 border-2 border-dashed border-muted-foreground/25 rounded-lg">
+              <Users className="w-12 h-12 text-muted-foreground/50 mx-auto mb-2" />
+              <p className="text-muted-foreground">아직 팀 구성원이 없습니다.</p>
+              {isEditing && (
+                <p className="text-sm text-muted-foreground mt-1">팀원 추가 버튼을 클릭하여 구성원을 추가하세요.</p>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {teamMembers.map((member) => (
+                <div key={member.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{member.display_name || member.name || '이름 없음'}</p>
+                    <p className="text-sm text-muted-foreground truncate">{member.email || '이메일 없음'}</p>
+                  </div>
+                  {isEditing && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveTeamMember(member.id)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {teamMembers.map((member) => (
-              <div key={member.id} className="flex items-center space-x-3 p-3 border rounded-lg">
-                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                  <User className="w-5 h-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{member.name}</p>
-                  <p className="text-sm text-muted-foreground truncate">{member.role}</p>
-                  <p className="text-xs text-muted-foreground truncate">{member.email}</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
 
         {/* 추가 정보 */}
@@ -516,13 +636,25 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
             <Button variant="outline" onClick={handleClose}>
               닫기
             </Button>
-            <Button onClick={() => setIsEditing(true)}>
-              <Edit className="w-4 h-4 mr-2" />
-              편집
-            </Button>
+            {canEditProject(project) && (
+              <Button onClick={() => setIsEditing(true)}>
+                <Edit className="w-4 h-4 mr-2" />
+                편집
+              </Button>
+            )}
           </>
         )}
       </div>
     </Modal>
+
+    {/* Team Member Add Modal */}
+    <TeamMemberAddModal
+      isOpen={isAddMemberModalOpen}
+      onClose={() => setIsAddMemberModalOpen(false)}
+      onAddMembers={handleAddTeamMembers}
+      project={project}
+      existingMembers={teamMembers}
+    />
+    </>
   )
 }

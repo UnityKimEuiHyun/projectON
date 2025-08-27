@@ -7,7 +7,7 @@ type ProjectUpdate = Database['public']['Tables']['projects']['Update']
 
 export class ProjectService {
   // 새 프로젝트 생성
-  static async createProject(projectData: Omit<ProjectInsert, 'id' | 'created_at' | 'updated_at'>): Promise<Project> {
+  static async createProject(projectData: Omit<ProjectInsert, 'id' | 'created_at' | 'updated_at'> & { group_id?: string | null }): Promise<Project> {
     console.log('🔍 프로젝트 생성 시작:', projectData)
     
     // 인증 상태 확인 및 토큰 갱신
@@ -31,6 +31,7 @@ export class ProjectService {
       .from('projects')
       .insert([{
         ...projectData,
+        group_id: projectData.group_id || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }])

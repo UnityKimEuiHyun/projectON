@@ -37,6 +37,7 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
   const [groupMemberCounts, setGroupMemberCounts] = useState<Record<string, number>>({})
   const [userAffiliations, setUserAffiliations] = useState<Record<string, boolean>>({})
   const [userJoinRequests, setUserJoinRequests] = useState<Record<string, boolean>>({})
+  const [userAuthority, setUserAuthority] = useState<'owner' | 'user'>('user')
 
   // 그룹 목록 로드
   useEffect(() => {
@@ -76,6 +77,9 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
       // 사용자의 가입 요청 상태 확인
       await loadUserJoinRequests(groupsData)
       
+      // 사용자의 권한 확인
+      await loadUserAuthority()
+      
       console.log('✅ 그룹 목록 로드 성공:', groupsData)
       
     } catch (error) {
@@ -89,6 +93,32 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
       setFilteredGroups([])
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // 사용자의 권한 확인
+  const loadUserAuthority = async () => {
+    if (!user) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('authority')
+        .eq('user_id', user.id)
+        .single()
+      
+      if (error) {
+        console.error('사용자 권한 조회 실패:', error)
+        setUserAuthority('user')
+        return
+      }
+      
+      setUserAuthority(data.authority || 'user')
+      console.log('✅ 사용자 권한 확인 완료:', data.authority)
+      
+    } catch (error) {
+      console.error('사용자 권한 확인 중 오류 발생:', error)
+      setUserAuthority('user')
     }
   }
 
@@ -275,11 +305,12 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
     }
 
     try {
-      // 먼저 사용자가 이미 다른 기업에 소속되어 있는지 확인
+      // 이미 이 기업에 소속되어 있는지 확인
       const { data: existingAffiliations, error: checkError } = await supabase
         .from('group_members')
         .select('id, group_id')
         .eq('user_id', user.id)
+        .eq('group_id', group.id)
       
       if (checkError) {
         console.error('❌ 기존 소속 확인 실패:', checkError)
@@ -292,22 +323,12 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
       }
       
       if (existingAffiliations && existingAffiliations.length > 0) {
-        const existingGroupId = existingAffiliations[0].group_id
-        if (existingGroupId !== group.id) {
-          toast({
-            title: "소속 제한",
-            description: "이미 다른 기업에 소속되어 있습니다. 한 번에 하나의 기업에만 소속될 수 있습니다.",
-            variant: "destructive",
-          })
-          return
-        } else {
-          toast({
-            title: "알림",
-            description: "이미 이 기업에 소속되어 있습니다.",
-            variant: "default",
-          })
-          return
-        }
+        toast({
+          title: "알림",
+          description: "이미 이 기업에 소속되어 있습니다.",
+          variant: "default",
+        })
+        return
       }
       
       // 이미 가입 요청을 보냈는지 확인 (pending 또는 rejected 상태)
@@ -422,113 +443,132 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
     }
   }
 
-  // 바로 소속 등록 (멤버가 0명인 기업)
-  const handleDirectJoin = async (group: Group) => {
-    if (!user) {
-      toast({
-        title: "오류",
-        description: "로그인이 필요합니다.",
-        variant: "destructive",
-      })
-      return
-    }
+     // 바로 소속 등록 (멤버가 0명인 기업)
+   const handleDirectJoin = async (group: Group) => {
+     if (!user) {
+       toast({
+         title: "오류",
+         description: "로그인이 필요합니다.",
+         variant: "destructive",
+       })
+       return
+     }
 
-    try {
-      console.log('🔄 바로 소속 등록 시작...', { groupId: group.id, groupName: group.name })
-      
-      // 먼저 사용자가 이미 다른 기업에 소속되어 있는지 확인
-      const { data: existingAffiliations, error: checkError } = await supabase
-        .from('group_members')
-        .select('id, group_id')
-        .eq('user_id', user.id)
-      
-      if (checkError) {
-        console.error('❌ 기존 소속 확인 실패:', checkError)
-        toast({
-          title: "오류",
-          description: "소속 상태를 확인할 수 없습니다.",
-          variant: "destructive",
-        })
-        return
-      }
-      
-      if (existingAffiliations && existingAffiliations.length > 0) {
-        const existingGroupId = existingAffiliations[0].group_id
-        if (existingGroupId !== group.id) {
-          toast({
-            title: "소속 제한",
-            description: "이미 다른 기업에 소속되어 있습니다. 한 번에 하나의 기업에만 소속될 수 있습니다.",
-            variant: "destructive",
-          })
-          return
-        } else {
-          toast({
-            title: "알림",
-            description: "이미 이 기업에 소속되어 있습니다.",
-            variant: "default",
-          })
-          return
-        }
-      }
-      
-      // group_members 테이블에 직접 추가
-      const { error } = await supabase
-        .from('group_members')
-        .insert({
-          group_id: group.id,
-          user_id: user.id,
-          role: 'member',
-          status: 'active',
-          joined_at: new Date().toISOString()
-        })
+     // 중복 요청 방지
+     if (isLoading) {
+       toast({
+         title: "알림",
+         description: "처리 중입니다. 잠시 기다려주세요.",
+         variant: "default",
+       })
+       return
+     }
 
-      if (error) {
-        console.error('❌ 소속 등록 실패:', error)
-        console.error('❌ 에러 상세 정보:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        })
-        
-        // 사용자당 하나의 소속만 허용하는 제약 조건 위반
-        if (error.message && error.message.includes('사용자는 한 번에 하나의 기업에만 소속될 수 있습니다')) {
-          toast({
-            title: "소속 제한",
-            description: "이미 다른 기업에 소속되어 있습니다. 한 번에 하나의 기업에만 소속될 수 있습니다.",
-            variant: "destructive",
-          })
-        } else {
-          throw new Error(`소속 등록에 실패했습니다: ${error.message}`)
-        }
-        return
-      }
+     try {
+       console.log('🔄 바로 소속 등록 시작...', { groupId: group.id, groupName: group.name })
+       
+       // 이미 이 기업에 소속되어 있는지 확인
+       const { data: existingAffiliations, error: checkError } = await supabase
+         .from('group_members')
+         .select('id, group_id')
+         .eq('user_id', user.id)
+         .eq('group_id', group.id)
+       
+       if (checkError) {
+         console.error('❌ 기존 소속 확인 실패:', checkError)
+         toast({
+           title: "오류",
+           description: "소속 상태를 확인할 수 없습니다.",
+           variant: "destructive",
+         })
+         return
+       }
+       
+       if (existingAffiliations && existingAffiliations.length > 0) {
+         toast({
+           title: "알림",
+           description: "이미 이 기업에 소속되어 있습니다.",
+           variant: "default",
+         })
+         return
+       }
+       
+       // 더 안전한 소속 등록 방식 사용
+       const { data, error } = await supabase
+         .from('group_members')
+         .upsert({
+           group_id: group.id,
+           user_id: user.id,
+           role: 'member',
+           status: 'active',
+           joined_at: new Date().toISOString()
+         }, {
+           onConflict: 'group_id,user_id',
+           ignoreDuplicates: false
+         })
+         .select()
+         .single()
 
-      toast({
-        title: "성공",
-        description: `${group.name} 기업에 바로 소속되었습니다.`,
-      })
+       if (error) {
+         console.error('❌ 소속 등록 실패:', error)
+         console.error('❌ 에러 상세 정보:', {
+           code: error.code,
+           message: error.message,
+           details: error.details,
+           hint: error.hint
+         })
+         
+         // 더 자세한 오류 정보 로깅
+         console.error('❌ 시도한 데이터:', {
+           group_id: group.id,
+           user_id: user.id,
+           role: 'member',
+           status: 'active',
+           joined_at: new Date().toISOString()
+         })
+         
+         // 중복 키 오류인 경우 특별 처리
+         if (error.code === '23505') {
+           toast({
+             title: "알림",
+             description: "이미 이 기업에 소속되어 있습니다.",
+             variant: "default",
+           })
+           // 소속 상태 새로고침
+           await loadUserAffiliations([group])
+           return
+         }
+         
+         throw new Error(`소속 등록에 실패했습니다: ${error.message}`)
+       }
 
-      // 그룹 목록 새로고침
-      loadGroups()
-      
-      // 소속 상태 업데이트
-      await loadUserAffiliations([group])
-      
-      // 부모 컴포넌트에 알림
-      if (onGroupCreated) {
-        onGroupCreated()
-      }
-      
-    } catch (error) {
-      console.error('❌ 바로 소속 등록 실패:', error)
-      toast({
-        title: "오류",
-        description: error instanceof Error ? error.message : "소속 등록에 실패했습니다.",
-        variant: "destructive",
-      })
-    }
-  }
+       console.log('✅ 소속 등록 성공:', data)
+
+       toast({
+         title: "성공",
+         description: `${group.name} 기업에 바로 소속되었습니다.`,
+       })
+
+       // 그룹 목록 새로고침
+       loadGroups()
+       
+       // 소속 상태 업데이트
+       await loadUserAffiliations([group])
+       
+       // 부모 컴포넌트에 알림
+       if (onGroupCreated) {
+         onGroupCreated()
+       }
+       
+     } catch (error) {
+       console.error('❌ 바로 소속 등록 실패:', error)
+       toast({
+         title: "오류",
+         description: error instanceof Error ? error.message : "소속 등록에 실패했습니다.",
+         variant: "destructive",
+       })
+     }
+   }
 
   // 기업 소속 해제
   const handleLeaveGroup = async (group: Group) => {
@@ -541,10 +581,29 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
       return
     }
 
+    // 소속해제 확인 다이얼로그
+    if (!confirm(`${group.name} 기업에서 소속을 해제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+      return
+    }
+
     try {
       console.log('🔄 소속 해제 시작...', { groupId: group.id, groupName: group.name })
       
-      // 기존 소속 레코드를 완전히 삭제
+      // 1. 먼저 group_join_requests에서 관련된 모든 이력 정리 (초대 이력 포함)
+      const { error: cleanupError } = await supabase
+        .from('group_join_requests')
+        .delete()
+        .eq('group_id', group.id)
+        .eq('user_id', user.id)
+      
+      if (cleanupError) {
+        console.error('❌ 가입 요청 이력 정리 실패:', cleanupError)
+        // 이력 정리 실패해도 소속 해제는 계속 진행
+      } else {
+        console.log('✅ 가입 요청 이력 정리 완료 (초대 이력 포함)')
+      }
+      
+      // 2. 기존 소속 레코드를 완전히 삭제
       const { error } = await supabase
         .from('group_members')
         .delete()
@@ -561,15 +620,17 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
         return
       }
 
+      console.log('✅ 소속 해제 완료')
+
       toast({
         title: "성공",
-        description: `${group.name} 기업에서 소속이 해제되었습니다.`,
+        description: `${group.name} 기업에서 소속이 해제되었습니다. 이제 다시 소속 요청을 할 수 있습니다.`,
       })
 
-      // 그룹 목록 새로고침
+      // 3. 그룹 목록 새로고침
       loadGroups()
       
-      // 부모 컴포넌트에 알림
+      // 4. 부모 컴포넌트에 알림
       if (onGroupCreated) {
         onGroupCreated()
       }
@@ -605,6 +666,19 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
       toast({
         title: "오류",
         description: "로그인이 필요합니다.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // owner 권한이거나 그룹 생성자인 경우에만 삭제 가능
+    const isOwner = userAuthority === 'owner'
+    const isGroupCreator = group.created_by === user.id
+    
+    if (!isOwner && !isGroupCreator) {
+      toast({
+        title: "권한 없음",
+        description: "기업을 삭제할 권한이 없습니다.",
         variant: "destructive",
       })
       return
@@ -675,7 +749,7 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title="소속 등록"
+        title="소속 관리"
       >
         <div className="space-y-4">
           {/* 신규 기업 등록 버튼 */}
@@ -686,62 +760,67 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
             </Button>
           </div>
 
-          {/* 현재 소속 기업 표시 */}
-          {(() => {
-            const currentAffiliation = Object.entries(userAffiliations).find(([_, isAffiliated]) => isAffiliated);
-            if (currentAffiliation) {
-              const [groupId, _] = currentAffiliation;
-              const currentGroup = groups.find(g => g.id === groupId);
-              if (currentGroup) {
-                return (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                          <Building2 className="w-4 h-4 text-green-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-green-800">현재 소속 기업</h3>
-                          <p className="text-sm text-green-700">{currentGroup.name}</p>
-                          {currentGroup.description && (
-                            <p className="text-xs text-green-600 mt-1">{currentGroup.description}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
-                          소속됨
-                        </Badge>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleLeaveGroup(currentGroup)}
-                          className="text-xs px-2 py-1 h-6 border-green-300 text-green-700 hover:bg-green-100"
-                        >
-                          소속 해제
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-            } else {
-              // 현재 소속된 기업이 없을 때 안내 메시지
-              return (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                      <Building2 className="w-4 h-4 text-gray-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-800">소속된 기업 없음</h3>
-                      <p className="text-sm text-gray-600">아직 소속된 기업이 없습니다. 아래에서 기업을 선택하여 소속을 등록하세요.</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-          })()}
+                     {/* 현재 소속 기업들 표시 */}
+           {(() => {
+             const currentAffiliations = Object.entries(userAffiliations).filter(([_, isAffiliated]) => isAffiliated);
+             if (currentAffiliations.length > 0) {
+               return (
+                 <div className="space-y-3">
+                   <h3 className="text-lg font-semibold text-gray-800">내 소속 기업</h3>
+                   {currentAffiliations.map(([groupId, _]) => {
+                     const currentGroup = groups.find(g => g.id === groupId);
+                     if (!currentGroup) return null;
+                     
+                     return (
+                       <div key={groupId} className="bg-green-50 border border-green-200 rounded-lg p-4">
+                         <div className="flex items-start justify-between">
+                           <div className="flex items-center space-x-3">
+                             <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                               <Building2 className="w-4 h-4 text-green-600" />
+                             </div>
+                             <div>
+                               <h4 className="font-medium text-green-800">{currentGroup.name}</h4>
+                               {currentGroup.description && (
+                                 <p className="text-sm text-green-700">{currentGroup.description}</p>
+                               )}
+                             </div>
+                           </div>
+                           <div className="flex items-center space-x-2">
+                             <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                               소속됨
+                             </Badge>
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => handleLeaveGroup(currentGroup)}
+                               className="text-xs px-2 py-1 h-6 border-green-300 text-green-700 hover:bg-green-100"
+                             >
+                               소속 해제
+                             </Button>
+                           </div>
+                         </div>
+                       </div>
+                     );
+                   })}
+                 </div>
+               );
+             } else {
+               // 현재 소속된 기업이 없을 때 안내 메시지
+               return (
+                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                   <div className="flex items-center space-x-3">
+                     <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                       <Building2 className="w-4 h-4 text-gray-600" />
+                     </div>
+                     <div>
+                       <h3 className="font-medium text-gray-800">소속된 기업 없음</h3>
+                       <p className="text-sm text-gray-600">아직 소속된 기업이 없습니다. 아래에서 기업을 선택하여 소속을 등록하세요.</p>
+                     </div>
+                   </div>
+                 </div>
+               );
+             }
+           })()}
 
           {/* 기업 목록 */}
           <div className="space-y-2">
@@ -771,9 +850,9 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
                 </p>
               </div>
             ) : (
-              filteredGroups
-                .filter(group => !userAffiliations[group.id]) // 현재 소속된 기업은 목록에서 제외
-                .map((group) => (
+                             filteredGroups
+                 .filter(group => !userAffiliations[group.id]) // 현재 소속된 기업들은 목록에서 제외
+                 .map((group) => (
                   <Card key={group.id} className="hover:shadow-md transition-shadow">
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
@@ -827,15 +906,18 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
                               <Users className="w-4 h-4 mr-2" />
                               소속 등록
                             </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleDeleteGroup(group)}
-                              className="w-full"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              삭제
-                            </Button>
+                            {/* owner 권한이거나 그룹 생성자인 경우에만 삭제 버튼 표시 */}
+                            {(userAuthority === 'owner' || group.created_by === user?.id) && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteGroup(group)}
+                                className="w-full"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                삭제
+                              </Button>
+                            )}
                           </div>
                         ) : (
                           // 멤버가 있는 경우 소속 요청
@@ -889,12 +971,7 @@ export function AffiliationModal({ isOpen, onClose, onGroupCreated }: Affiliatio
           )}
         </div>
 
-        {/* 푸터 - 소속 제한 안내 */}
-        <div className="border-t pt-4 mt-6">
-          <div className="text-center text-xs text-muted-foreground bg-muted/30 rounded-md py-2 px-3">
-            <span className="font-medium">ℹ</span> 사용자는 한 번에 하나의 기업에만 소속될 수 있습니다
-          </div>
-        </div>
+        
       </Modal>
 
       {/* 신규 기업 등록 모달 */}

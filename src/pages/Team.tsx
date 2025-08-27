@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+
 import { 
   Search, 
   Mail,
@@ -14,7 +15,10 @@ import {
   List,
   Grid3X3,
   Check,
-  X
+  X,
+  Trash2,
+  Star,
+  StarOff
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -45,6 +49,7 @@ const Team = () => {
   const [isAffiliationModalOpen, setIsAffiliationModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [userAffiliations, setUserAffiliations] = useState<Group[]>([])
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null)
   const [isLoadingAffiliations, setIsLoadingAffiliations] = useState(false)
   const [companyMembers, setCompanyMembers] = useState<GroupMember[]>([])
   const [isLoadingMembers, setIsLoadingMembers] = useState(false)
@@ -59,7 +64,7 @@ const Team = () => {
     member.status?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-    // 사용자 기업 소속 정보 로드
+  // 사용자 기업 소속 정보 로드
   useEffect(() => {
     const loadUserAffiliations = async () => {
       if (!user?.id) return
@@ -69,20 +74,21 @@ const Team = () => {
         const affiliations = await AffiliationService.getUserAffiliations(user.id)
         setUserAffiliations(affiliations)
         
-        // 소속된 기업이 있으면 해당 기업의 멤버들을 가져옴
+        // 소속된 기업이 있으면 첫 번째 기업을 기본 선택
         if (affiliations.length > 0) {
+          setSelectedGroup(affiliations[0])
           const groupId = affiliations[0].id
           await loadCompanyMembers(groupId)
           await checkAdminStatus(groupId)
-          // admin 권한 확인 완료
         } else {
           setCompanyMembers([])
+          setSelectedGroup(null)
         }
       } catch (error) {
         console.error('사용자 기업 소속 정보 로드 실패:', error)
-        // 에러가 발생해도 빈 배열로 설정하여 UI가 계속 작동하도록 함
         setUserAffiliations([])
         setCompanyMembers([])
+        setSelectedGroup(null)
       } finally {
         setIsLoadingAffiliations(false)
       }
@@ -91,20 +97,76 @@ const Team = () => {
     loadUserAffiliations()
   }, [user?.id])
 
+  // 선택된 기업이 변경될 때마다 해당 기업의 정보 로드
+  useEffect(() => {
+    if (selectedGroup) {
+      loadCompanyMembers(selectedGroup.id)
+      checkAdminStatus(selectedGroup.id)
+    }
+  }, [selectedGroup])
+
   // admin 권한이 변경될 때마다 대기 중인 요청 로드
   useEffect(() => {
-    if (isAdmin && userAffiliations.length > 0) {
-      const groupId = userAffiliations[0].id
-      loadPendingRequests(groupId)
+    if (isAdmin && selectedGroup) {
+      loadPendingRequests(selectedGroup.id)
     }
-  }, [isAdmin, userAffiliations])
+  }, [isAdmin, selectedGroup])
 
-  // 사용자의 admin 권한 확인
+  // 기본 기업 설정 함수
+  const setDefaultGroup = async (group: Group) => {
+    if (!user) return
+    
+    try {
+      // profiles 테이블에 default_group_id 필드가 있다면 업데이트
+      // 없다면 로컬 스토리지에 저장
+      localStorage.setItem('defaultGroupId', group.id)
+      
+      toast({
+        title: "성공",
+        description: `${group.name}이(가) 기본 기업으로 설정되었습니다.`,
+      })
+    } catch (error) {
+      console.error('기본 기업 설정 실패:', error)
+      toast({
+        title: "오류",
+        description: "기본 기업 설정에 실패했습니다.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // 기본 기업 해제 함수
+  const removeDefaultGroup = async () => {
+    try {
+      localStorage.removeItem('defaultGroupId')
+      
+      toast({
+        title: "성공",
+        description: "기본 기업 설정이 해제되었습니다.",
+      })
+    } catch (error) {
+      console.error('기본 기업 해제 실패:', error)
+      toast({
+        title: "오류",
+        description: "기본 기업 해제에 실패했습니다.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // 기본 기업인지 확인
+  const isDefaultGroup = (group: Group) => {
+    const defaultGroupId = localStorage.getItem('defaultGroupId')
+    return defaultGroupId === group.id
+  }
+
+  // 사용자의 admin 권한 또는 그룹 생성자 권한 확인
   const checkAdminStatus = async (groupId: string) => {
     if (!user) return
     
     try {
-      const { data, error } = await supabase
+      // 1. group_members에서 admin 권한 확인
+      const { data: memberData, error: memberError } = await supabase
         .from('group_members')
         .select('role')
         .eq('group_id', groupId)
@@ -112,17 +174,32 @@ const Team = () => {
         .eq('status', 'active')
         .single()
       
-      if (error) {
-        console.error('❌ admin 권한 확인 실패:', error)
+      // 2. groups 테이블에서 그룹 생성자 확인
+      const { data: groupData, error: groupError } = await supabase
+        .from('groups')
+        .select('created_by')
+        .eq('id', groupId)
+        .single()
+      
+      if (memberError && groupError) {
+        console.error('❌ 권한 확인 실패:', { memberError, groupError })
         setIsAdmin(false)
         return
       }
       
-      setIsAdmin(data?.role === 'admin')
-      console.log('✅ admin 권한 확인 완료:', data?.role === 'admin')
+      // admin 권한이 있거나 그룹 생성자인 경우
+      const isAdminRole = memberData?.role === 'admin'
+      const isGroupCreator = groupData?.created_by === user.id
+      
+      setIsAdmin(isAdminRole || isGroupCreator)
+      console.log('✅ 권한 확인 완료:', { 
+        isAdminRole, 
+        isGroupCreator, 
+        isAdmin: isAdminRole || isGroupCreator 
+      })
       
     } catch (error) {
-      console.error('❌ admin 권한 확인 중 예외 발생:', error)
+      console.error('❌ 권한 확인 중 예외 발생:', error)
       setIsAdmin(false)
     }
   }
@@ -153,20 +230,20 @@ const Team = () => {
       
       console.log('✅ 기본 쿼리 성공, 사용자 정보 포함:', data)
       
-      // 사용자 정보를 포함하여 데이터 설정
-      if (data && data.length > 0) {
-        const requestsWithUserInfo = data.map(request => ({
-          ...request,
-          profiles: {
-            display_name: request.user_display_name || '이름 없음',
-            email: request.user_email || '이메일 없음',
-            phone: null
-          }
-        }))
-        
-        setPendingRequests(requestsWithUserInfo)
-        console.log('✅ 사용자 정보 포함하여 완료:', requestsWithUserInfo)
-      } else {
+             // 사용자 정보를 포함하여 데이터 설정
+       if (data && data.length > 0) {
+         const requestsWithUserInfo = data.map((request: any) => ({
+           ...request,
+           profiles: {
+             display_name: request.user_display_name || '이름 없음',
+             email: request.user_email || '이메일 없음',
+             phone: null
+           }
+         }))
+         
+         setPendingRequests(requestsWithUserInfo)
+         console.log('✅ 사용자 정보 포함하여 완료:', requestsWithUserInfo)
+       } else {
         setPendingRequests([])
         console.log('✅ 대기 중인 요청 없음')
       }
@@ -181,7 +258,7 @@ const Team = () => {
 
   // 가입 요청 승인/거절 처리
   const handleRequestAction = async (requestId: string, action: 'approve' | 'reject') => {
-    if (!user || !isAdmin) return
+    if (!user || !isAdmin || !selectedGroup) return
     
     try {
       const request = pendingRequests.find(r => r.id === requestId)
@@ -360,8 +437,18 @@ const Team = () => {
         }
       }
       
-      console.log('기업 멤버 정보 로드 성공:', membersWithProfiles)
-      setCompanyMembers(membersWithProfiles)
+      // 현재 사용자를 우선적으로 정렬: 현재 사용자가 먼저, 그 다음 다른 인원들
+      const sortedMembers = membersWithProfiles.sort((a, b) => {
+        // 현재 사용자인 경우 가장 앞으로
+        if (a.user_id === user.id) return -1
+        if (b.user_id === user.id) return 1
+        
+        // 그 외에는 가입일 순으로 정렬 (최신 가입자가 뒤로)
+        return new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime()
+      })
+      
+      console.log('기업 멤버 정보 로드 성공 (정렬됨):', sortedMembers)
+      setCompanyMembers(sortedMembers)
       
     } catch (error) {
       console.error('기업 멤버 정보 로드 실패:', error)
@@ -386,6 +473,169 @@ const Team = () => {
     }
   }
 
+  // 기업 소속 해제 함수
+  const handleLeaveGroup = async (group: Group) => {
+    if (!user) {
+      toast({
+        title: "오류",
+        description: "로그인이 필요합니다.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // 소속해제 확인 다이얼로그
+    if (!confirm(`${group.name} 기업에서 소속을 해제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+      return
+    }
+
+    try {
+      console.log('🔄 소속 해제 시작...', { groupId: group.id, groupName: group.name })
+      
+      // 1. 먼저 group_join_requests에서 관련된 모든 이력 정리 (초대 이력 포함)
+      const { error: cleanupError } = await supabase
+        .from('group_join_requests')
+        .delete()
+        .eq('group_id', group.id)
+        .eq('user_id', user.id)
+      
+      if (cleanupError) {
+        console.error('❌ 가입 요청 이력 정리 실패:', cleanupError)
+        // 이력 정리 실패해도 소속 해제는 계속 진행
+      } else {
+        console.log('✅ 가입 요청 이력 정리 완료 (초대 이력 포함)')
+      }
+      
+      // 2. 기존 소속 레코드를 완전히 삭제
+      const { error } = await supabase
+        .from('group_members')
+        .delete()
+        .eq('group_id', group.id)
+        .eq('user_id', user.id)
+
+      if (error) {
+        console.error('❌ 소속 해제 실패:', error)
+        toast({
+          title: "오류",
+          description: "소속 해제에 실패했습니다.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      console.log('✅ 소속 해제 완료')
+
+      toast({
+        title: "성공",
+        description: `${group.name} 기업에서 소속이 해제되었습니다. 이제 다시 소속 요청을 할 수 있습니다.`,
+      })
+
+      // 3. 소속 정보 새로고침
+      if (user) {
+        const affiliations = await AffiliationService.getUserAffiliations(user.id)
+        setUserAffiliations(affiliations)
+        
+        // 소속된 기업이 없으면 멤버 목록도 초기화
+        if (affiliations.length === 0) {
+          setCompanyMembers([])
+          setSelectedGroup(null)
+          setIsAdmin(false)
+        } else {
+          // 첫 번째 기업을 선택
+          setSelectedGroup(affiliations[0])
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ 소속 해제 실패:', error)
+      toast({
+        title: "오류",
+        description: "소속 해제에 실패했습니다.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // 멤버 제거 함수
+  const handleRemoveMember = async (member: GroupMember) => {
+    if (!user || !selectedGroup) return
+    
+    const groupId = selectedGroup.id
+    
+    // 그룹 생성자 또는 admin 권한이 있는지 확인
+    if (!isAdmin) {
+      toast({
+        title: "권한 없음",
+        description: "멤버를 제거할 권한이 없습니다.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (confirm(`${member.profiles.display_name || '이름 없는 사용자'}를 기업에서 제거하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+      try {
+        console.log('🔄 멤버 제거 시작:', { 
+          memberId: member.id, 
+          memberName: member.profiles.display_name,
+          groupId 
+        })
+
+        // 1. 먼저 group_join_requests에서 관련된 모든 이력 정리
+        const { error: cleanupError } = await supabase
+          .from('group_join_requests')
+          .delete()
+          .eq('group_id', groupId)
+          .eq('user_id', member.user_id)
+        
+        if (cleanupError) {
+          console.error('❌ 가입 요청 이력 정리 실패:', cleanupError)
+          // 이력 정리 실패해도 멤버 제거는 계속 진행
+        } else {
+          console.log('✅ 가입 요청 이력 정리 완료')
+        }
+
+        // 2. group_members에서 해당 멤버 삭제
+        const { error: memberError } = await supabase
+          .from('group_members')
+          .delete()
+          .eq('id', member.id)
+        
+        if (memberError) {
+          console.error('❌ 멤버 제거 실패:', memberError)
+          toast({
+            title: "오류",
+            description: "멤버 제거에 실패했습니다.",
+            variant: "destructive",
+          })
+          return
+        }
+
+        console.log('✅ 멤버 제거 완료')
+
+        toast({
+          title: "성공",
+          description: `${member.profiles.display_name || '이름 없는 사용자'}가 기업에서 제거되었습니다. 이제 다시 소속 요청을 할 수 있습니다.`,
+        })
+
+        // 3. 멤버 목록 새로고침
+        await loadCompanyMembers(groupId)
+        
+        // 4. 대기 중인 요청 목록도 새로고침 (admin인 경우)
+        if (isAdmin) {
+          await loadPendingRequests(groupId)
+        }
+        
+      } catch (error) {
+        console.error('❌ 멤버 제거 중 오류 발생:', error)
+        toast({
+          title: "오류",
+          description: "멤버 제거 중 오류가 발생했습니다.",
+          variant: "destructive",
+        })
+      }
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -397,7 +647,7 @@ const Team = () => {
         <div className="flex space-x-2">
           <Button variant="outline" onClick={() => setIsAffiliationModalOpen(true)}>
             <Building2 className="w-4 h-4 mr-2" />
-            소속 등록
+            소속 관리
           </Button>
           <Button>
             <UserPlus className="w-4 h-4 mr-2" />
@@ -406,62 +656,110 @@ const Team = () => {
         </div>
       </div>
 
-      {/* User Affiliations */}
-      <div className="bg-muted/50 rounded-lg p-4">
-        <h3 className="text-lg font-semibold mb-3">내 소속 기업</h3>
-        {isLoadingAffiliations ? (
-          <div className="text-center py-4">
-            <p className="text-muted-foreground">소속 정보를 불러오는 중...</p>
-          </div>
-        ) : userAffiliations.length > 0 ? (
-          <div className="space-y-3">
-            {userAffiliations.map((affiliation) => (
-              <div key={affiliation.id} className="flex items-center justify-between bg-background rounded-lg p-3 border">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <Building2 className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium">{affiliation.name}</p>
-                    {affiliation.description && (
-                      <p className="text-sm text-muted-foreground">{affiliation.description}</p>
-                    )}
-                  </div>
-                </div>
-                <Badge variant="secondary" className="bg-green-100 text-green-800">
-                  소속됨
-                </Badge>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-4">
-            <p className="text-muted-foreground mb-3">아직 소속된 기업이 없습니다.</p>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setIsAffiliationModalOpen(true)}
-            >
-              <Building2 className="w-4 h-4 mr-2" />
-              기업 소속 등록하기
-            </Button>
-          </div>
-        )}
-      </div>
+            {/* User Affiliations */}
+       <div className="bg-muted/50 rounded-lg p-4">
+         <h3 className="text-lg font-semibold mb-3">내 소속 기업</h3>
+         {isLoadingAffiliations ? (
+           <div className="text-center py-4">
+             <p className="text-muted-foreground">소속 정보를 불러오는 중...</p>
+           </div>
+         ) : userAffiliations.length > 0 ? (
+           <div className="space-y-3">
+             <div className="flex flex-wrap gap-3">
+               {userAffiliations.map((affiliation) => (
+                 <div key={affiliation.id} className="flex items-center space-x-2">
+                   <Button
+                     variant={selectedGroup?.id === affiliation.id ? "default" : "outline"}
+                     size="sm"
+                     onClick={() => setSelectedGroup(affiliation)}
+                     className={`px-4 py-2 ${
+                       selectedGroup?.id === affiliation.id 
+                         ? 'bg-primary text-primary-foreground' 
+                         : 'hover:bg-muted'
+                     }`}
+                   >
+                     <Building2 className="w-4 h-4 mr-2" />
+                     {affiliation.name}
+                     {isDefaultGroup(affiliation) && (
+                       <Star className="w-4 h-4 ml-2 text-yellow-500 fill-current" />
+                     )}
+                   </Button>
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={() => handleLeaveGroup(affiliation)}
+                     className="text-xs px-2 py-2 h-8 border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400"
+                   >
+                     해제
+                   </Button>
+                 </div>
+               ))}
+             </div>
+             
+             {/* 기본 기업 설정 버튼 */}
+             {selectedGroup && (
+               <div className="flex items-center space-x-2 mt-3 pt-3 border-t">
+                 <span className="text-sm text-muted-foreground">기본 기업 설정:</span>
+                 {isDefaultGroup(selectedGroup) ? (
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={() => removeDefaultGroup()}
+                     className="text-xs px-3 py-1 h-7 border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                   >
+                     <StarOff className="w-4 h-4 mr-1" />
+                     기본 해제
+                   </Button>
+                 ) : (
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={() => setDefaultGroup(selectedGroup)}
+                     className="text-xs px-3 py-1 h-7 border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                   >
+                     <Star className="w-4 h-4 mr-1" />
+                     기본 설정
+                   </Button>
+                 )}
+                 <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                   {isDefaultGroup(selectedGroup) ? '기본 기업' : '선택됨'}
+                 </Badge>
+               </div>
+             )}
+           </div>
+         ) : (
+           <div className="text-center py-4">
+             <p className="text-muted-foreground mb-3">아직 소속된 기업이 없습니다.</p>
+             <Button 
+               variant="outline" 
+               size="sm"
+               onClick={() => setIsAffiliationModalOpen(true)}
+             >
+               <Building2 className="w-4 h-4 mr-2" />
+               기업 소속 등록하기
+             </Button>
+           </div>
+         )}
+       </div>
 
-      {/* 소속된 기업이 있을 때만 멤버 목록 표시 */}
-      {userAffiliations.length > 0 && (
+      
+
+      {/* 선택된 기업이 있을 때만 멤버 목록 표시 */}
+      {selectedGroup && (
         <>
           {/* Search and View Toggle */}
           <div className="flex items-center justify-between">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="멤버 검색..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+            <div className="flex items-center space-x-3">
+              <h3 className="text-lg font-semibold">{selectedGroup.name} - 멤버 관리</h3>
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="멤버 검색..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </div>
             
             {/* View Mode Toggle */}
@@ -490,7 +788,7 @@ const Team = () => {
             </div>
           </div>
 
-                    {/* Team Members and Invitation Management - Two Column Layout */}
+          {/* Team Members and Invitation Management - Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Left Column - Registered Members */}
             <div>
@@ -503,20 +801,42 @@ const Team = () => {
                 // List View
                 <div className="space-y-3">
                   {filteredMembers.map((member) => (
-                    <Card key={member.id} className="hover:shadow-md transition-shadow">
+                    <Card 
+                      key={member.id} 
+                      className={`hover:shadow-md transition-shadow ${
+                        member.user_id === user?.id 
+                          ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-200' 
+                          : 'bg-white border-gray-200'
+                      }`}
+                    >
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-4">
-                            <Avatar className="h-10 w-10">
+                            <Avatar className={`h-10 w-10 ${
+                              member.user_id === user?.id 
+                                ? 'ring-2 ring-blue-400' 
+                                : ''
+                            }`}>
                               <AvatarImage src={undefined} />
-                              <AvatarFallback>
+                              <AvatarFallback className={
+                                member.user_id === user?.id 
+                                  ? 'bg-blue-100 text-blue-700' 
+                                  : ''
+                              }>
                                 {member.profiles.display_name?.charAt(0) || 'U'}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
                               <div className="flex items-center space-x-3">
-                                <CardTitle className="text-lg">
+                                <CardTitle className={`text-lg ${
+                                  member.user_id === user?.id 
+                                    ? 'text-blue-800' 
+                                    : 'text-gray-900'
+                                }`}>
                                   {member.profiles.display_name || '이름 없음'}
+                                  {member.user_id === user?.id && (
+                                    <span className="ml-2 text-sm text-blue-600 font-medium bg-blue-100 px-2 py-1 rounded-full">나</span>
+                                  )}
                                 </CardTitle>
                                 {getStatusBadge(member.status)}
                                 {member.role === 'admin' && (
@@ -542,18 +862,17 @@ const Team = () => {
                             <Button variant="outline" size="sm">
                               연락하기
                             </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreVertical className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem>프로필 보기</DropdownMenuItem>
-                                <DropdownMenuItem>편집</DropdownMenuItem>
-                                <DropdownMenuItem className="text-red-600">제거</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            {/* admin 권한이 있는 경우에만 삭제 버튼 표시 */}
+                            {isAdmin && (
+                              <Button 
+                                variant="destructive" 
+                                size="sm"
+                                onClick={() => handleRemoveMember(member)}
+                                className="h-8 px-2"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </CardContent>
@@ -564,37 +883,66 @@ const Team = () => {
                 // Grid View
                 <div className="grid grid-cols-1 gap-4">
                   {filteredMembers.map((member) => (
-                    <Card key={member.id} className="hover:shadow-md transition-shadow">
-                      <CardHeader>
+                    <Card 
+                      key={member.id} 
+                      className={`hover:shadow-md transition-shadow ${
+                        member.user_id === user?.id 
+                          ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-200' 
+                          : 'bg-white border-gray-200'
+                      }`}
+                    >
+                      <CardHeader className={
+                        member.user_id === user?.id 
+                          ? 'bg-blue-100/50' 
+                          : ''
+                      }>
                         <div className="flex items-start justify-between">
                           <div className="flex items-center space-x-3">
-                            <Avatar className="h-12 w-12">
+                            <Avatar className={`h-12 w-12 ${
+                              member.user_id === user?.id 
+                                ? 'ring-2 ring-blue-400' 
+                                : ''
+                            }`}>
                               <AvatarImage src={undefined} />
-                              <AvatarFallback>
+                              <AvatarFallback className={
+                                member.user_id === user?.id 
+                                  ? 'bg-blue-100 text-blue-700' 
+                                  : ''
+                              }>
                                 {member.profiles.display_name?.charAt(0) || 'U'}
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                              <CardTitle className="text-lg">
+                              <CardTitle className={`text-lg ${
+                                member.user_id === user?.id 
+                                  ? 'text-blue-800' 
+                                  : 'text-gray-900'
+                              }`}>
                                 {member.profiles.display_name || '이름 없음'}
+                                {member.user_id === user?.id && (
+                                  <span className="ml-2 text-sm text-blue-600 font-medium bg-blue-100 px-2 py-1 rounded-full">나</span>
+                                )}
                               </CardTitle>
-                              <CardDescription>
+                              <CardDescription className={
+                                member.user_id === user?.id 
+                                  ? 'text-blue-600' 
+                                  : ''
+                              }>
                                 {member.profiles.email || '이메일 없음'}
                               </CardDescription>
                             </div>
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem>프로필 보기</DropdownMenuItem>
-                              <DropdownMenuItem>편집</DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">제거</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          {/* admin 권한이 있는 경우에만 삭제 버튼 표시 */}
+                          {isAdmin && (
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => handleRemoveMember(member)}
+                              className="h-8 px-2"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
@@ -603,7 +951,7 @@ const Team = () => {
                             <Mail className="w-4 h-4 mr-2" />
                             {member.profiles.email || '이메일 없음'}
                           </div>
-                          <div className="flex items-center text-sm text-muted-foreground">
+                          <div className="flex items-center space-x-2">
                             <Phone className="w-4 h-4 mr-2" />
                             {member.profiles.phone || '전화번호 없음'}
                           </div>
@@ -650,40 +998,40 @@ const Team = () => {
                 ) : pendingRequests.length > 0 ? (
                   <div className="space-y-3">
                     {pendingRequests.map((request) => (
-                          <div key={request.id} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div className="flex-1">
-                              <div className="font-medium">
-                                {request.profiles?.display_name || '이름 없음'}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {request.profiles?.email || '이메일 없음'}
-                              </div>
-                              {request.message && (
-                                <div className="text-sm text-gray-600 mt-1">
-                                  메시지: {request.message}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handleRequestAction(request.id, 'approve')}
-                                className="bg-green-600 hover:bg-green-700"
-                              >
-                                <Check className="w-4 h-4 mr-1" />
-                                승인
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => handleRequestAction(request.id, 'reject')}
-                              >
-                                <X className="w-4 h-4 mr-1" />
-                                거절
-                              </Button>
-                            </div>
+                      <div key={request.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <div className="font-medium">
+                            {request.profiles?.display_name || '이름 없음'}
                           </div>
-                        ))}
+                          <div className="text-sm text-gray-500">
+                            {request.profiles?.email || '이메일 없음'}
+                          </div>
+                          {request.message && (
+                            <div className="text-sm text-gray-600 mt-1">
+                              메시지: {request.message}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleRequestAction(request.id, 'approve')}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <Check className="w-4 h-4 mr-1" />
+                            승인
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleRequestAction(request.id, 'reject')}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            거절
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <div className="text-center py-8">
@@ -696,18 +1044,18 @@ const Team = () => {
         </>
       )}
 
-             {/* 소속된 기업이 없을 때 표시할 메시지 */}
-       {userAffiliations.length === 0 && (
-         <div className="text-center py-12">
-           <div className="max-w-md mx-auto">
-             <Building2 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-             <h3 className="text-lg font-semibold mb-2">소속된 기업이 없습니다</h3>
-             <p className="text-muted-foreground mb-4">
-               기업에 소속되어야 조직원들을 확인할 수 있습니다.
-             </p>
-           </div>
-         </div>
-       )}
+      {/* 소속된 기업이 없을 때 표시할 메시지 */}
+      {userAffiliations.length === 0 && (
+        <div className="text-center py-12">
+          <div className="max-w-md mx-auto">
+            <Building2 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">소속된 기업이 없습니다</h3>
+            <p className="text-muted-foreground mb-4">
+              기업에 소속되어야 조직원들을 확인할 수 있습니다.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 소속 등록 모달 */}
       <AffiliationModal
