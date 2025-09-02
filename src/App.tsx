@@ -14,6 +14,10 @@ import Settings from "./pages/Settings";
 import ProfileEdit from "./pages/ProfileEdit";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Organization from "./pages/Organization";
+import Timeline from "./pages/Timeline";
+import WBSManagement from "./pages/WBSManagement";
+import ProjectCostManagement from "./pages/ProjectCostManagement";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient();
@@ -42,6 +46,20 @@ const App = () => (
                   </Layout>
                 </ProtectedRoute>
               } />
+              <Route path="/projects/wbs" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <WBSManagement />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              <Route path="/projects/cost" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ProjectCostManagement />
+                  </Layout>
+                </ProtectedRoute>
+              } />
               <Route path="/team" element={
                 <ProtectedRoute>
                   <Layout>
@@ -49,10 +67,24 @@ const App = () => (
                   </Layout>
                 </ProtectedRoute>
               } />
+              <Route path="/organization" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Organization />
+                  </Layout>
+                </ProtectedRoute>
+              } />
               <Route path="/calendar" element={
                 <ProtectedRoute>
                   <Layout>
                     <Calendar />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              <Route path="/timeline" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Timeline />
                   </Layout>
                 </ProtectedRoute>
               } />

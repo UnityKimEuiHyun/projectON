@@ -11,7 +11,10 @@ import {
   Users, 
   Trash2,
   Filter,
-  Loader2
+  Loader2,
+  Check,
+  CheckCircle,
+  Circle
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -45,6 +48,7 @@ const Projects = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [viewingProject, setViewingProject] = useState<Project | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
 
   // 프로젝트 목록 불러오기
   const loadProjects = async () => {
@@ -211,6 +215,30 @@ const Projects = () => {
     })
   }
 
+  const handleProjectSelect = (project: Project) => {
+    setSelectedProjects(prev => new Set([...prev, project.id]))
+  }
+
+  const handleProjectDeselect = (project: Project) => {
+    setSelectedProjects(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(project.id)
+      return newSet
+    })
+  }
+
+  const handleProjectToggle = (project: Project) => {
+    if (selectedProjects.has(project.id)) {
+      handleProjectDeselect(project)
+    } else {
+      handleProjectSelect(project)
+    }
+  }
+
+  const clearAllSelections = () => {
+    setSelectedProjects(new Set())
+  }
+
   // 프로젝트 삭제 권한 확인
   const canDeleteProject = (project: Project): boolean => {
     if (!user) return false
@@ -264,14 +292,40 @@ const Projects = () => {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold">프로젝트</h1>
           <p className="text-muted-foreground">모든 프로젝트를 관리하고 추적하세요</p>
         </div>
-                 <Button onClick={handleCreateProject}>
-           <Plus className="w-4 h-4 mr-2" />
-           새 프로젝트
-         </Button>
+        
+        {/* Selected Projects Info in Header */}
+        {selectedProjects.size > 0 && (
+          <div className="flex items-center space-x-4 mx-6">
+            <div className="flex items-center space-x-3 bg-primary/5 border border-primary/20 rounded-lg px-4 py-2">
+              <CheckCircle className="w-5 h-5 text-primary" />
+              <div>
+                <p className="text-sm font-medium text-primary">
+                  {selectedProjects.size}개 프로젝트 선택됨
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {projects.filter(p => selectedProjects.has(p.id)).map(p => p.name).join(', ')}
+                </p>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={clearAllSelections}
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              >
+                ×
+              </Button>
+            </div>
+          </div>
+        )}
+        
+        <Button onClick={handleCreateProject}>
+          <Plus className="w-4 h-4 mr-2" />
+          새 프로젝트
+        </Button>
       </div>
 
       {/* Search and Filter */}
@@ -305,7 +359,14 @@ const Projects = () => {
       {/* Projects Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredProjects.map((project) => (
-          <Card key={project.id} className="hover:shadow-md transition-shadow">
+          <Card 
+            key={project.id} 
+            className={`hover:shadow-md transition-all duration-200 ${
+              selectedProjects.has(project.id)
+                ? 'ring-2 ring-primary bg-primary/5 shadow-lg' 
+                : 'hover:shadow-lg'
+            }`}
+          >
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="space-y-1 flex-1">
@@ -314,17 +375,43 @@ const Projects = () => {
                     {project.description}
                   </CardDescription>
                 </div>
-                {canDeleteProject(project) && (
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => handleDeleteProject(project)}
-                    title="프로젝트 삭제"
+                <div className="flex items-center gap-2">
+                  {/* 프로젝트 체크박스 */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-8 w-8 ${
+                      selectedProjects.has(project.id)
+                        ? 'text-primary hover:text-primary' 
+                        : 'text-muted-foreground hover:text-primary'
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleProjectToggle(project)
+                    }}
+                    title={selectedProjects.has(project.id) ? "선택 해제" : "프로젝트 선택"}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    {selectedProjects.has(project.id) ? (
+                      <CheckCircle className="h-5 w-5" />
+                    ) : (
+                      <Circle className="h-5 w-5" />
+                    )}
                   </Button>
-                )}
+                  {canDeleteProject(project) && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteProject(project)
+                      }}
+                      title="프로젝트 삭제"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 {getStatusBadge(project.status)}
@@ -353,13 +440,37 @@ const Projects = () => {
                 </div>
               </div>
               
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => handleViewProject(project)}
-              >
-                프로젝트 보기
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleViewProject(project)
+                  }}
+                >
+                  상세보기
+                </Button>
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    // 프로젝트 열기 기능 - localStorage에 저장하고 이벤트 발생
+                    localStorage.setItem('openProject', JSON.stringify(project))
+                    // 같은 탭에서 localStorage 이벤트를 수동으로 발생시킴
+                    window.dispatchEvent(new StorageEvent('storage', {
+                      key: 'openProject',
+                      newValue: JSON.stringify(project),
+                      oldValue: localStorage.getItem('openProject')
+                    }))
+                  }}
+                  className="min-w-[80px]"
+                >
+                  프로젝트 열기
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}
