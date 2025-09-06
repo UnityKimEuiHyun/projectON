@@ -1,10 +1,10 @@
-import { useState } from "react"
+import React, { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BarChart3, Plus, Edit, Trash2, ChevronDown, ChevronRight, Calendar, User, Table, GanttChart, Filter, Download, ZoomIn, ZoomOut } from "lucide-react"
+import { BarChart3, Plus, Edit, Trash2, ChevronDown, ChevronRight, Calendar, User, Table, GanttChart, Filter, Download, Search, Minus, Plus as PlusIcon } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 // 드롭다운 스타일을 위한 CSS
@@ -55,10 +55,59 @@ interface WBSTask {
 export default function WBSManagement() {
   const { toast } = useToast()
   
+  // Lv1 테마색 정의
+  const getThemeColor = (taskId: string, level: number) => {
+    // Lv1 작업의 ID를 추출 (예: "1-1-1" -> "1")
+    const lv1Id = taskId.split('-')[0]
+    
+    // Lv1별 테마색 정의
+    const themeColors = {
+      '1': { // 프로젝트 기획
+        base: '#3b82f6', // blue-500
+        light: '#dbeafe', // blue-100
+        lighter: '#eff6ff' // blue-50
+      },
+      '2': { // 디자인
+        base: '#10b981', // emerald-500
+        light: '#d1fae5', // emerald-100
+        lighter: '#ecfdf5' // emerald-50
+      },
+      '3': { // 개발
+        base: '#f59e0b', // amber-500
+        light: '#fef3c7', // amber-100
+        lighter: '#fffbeb' // amber-50
+      },
+      '4': { // 테스트
+        base: '#ef4444', // red-500
+        light: '#fecaca', // red-100
+        lighter: '#fef2f2' // red-50
+      },
+      '5': { // 배포
+        base: '#8b5cf6', // violet-500
+        light: '#e9d5ff', // violet-100
+        lighter: '#f5f3ff' // violet-50
+      }
+    }
+    
+    const theme = themeColors[lv1Id as keyof typeof themeColors] || themeColors['1']
+    
+    // 레벨에 따라 색상 반환
+    let color
+    switch (level) {
+      case 1: color = theme.base; break
+      case 2: color = theme.light; break
+      case 3: color = theme.lighter; break
+      default: color = theme.lighter
+    }
+    
+    return color
+  }
+
   // 날짜 유효성 검사 함수
   const validateDateInput = (pos: number, value: string, currentDate: string) => {
     if (pos === 4) { // MM 첫 번째 자리
-      const month = value + (currentDate[5] || '')
+      const month = currentDate.slice(4, 6) // MM 부분 추출
+      
       if (month.length === 2) {
         const monthNum = parseInt(month)
         if (monthNum < 1 || monthNum > 12) {
@@ -71,7 +120,7 @@ export default function WBSManagement() {
         }
       }
     } else if (pos === 5) { // MM 두 번째 자리
-      const month = (currentDate[4] || '') + value
+      const month = currentDate.slice(4, 6) // MM 부분 추출
       if (month.length === 2) {
         const monthNum = parseInt(month)
         if (monthNum < 1 || monthNum > 12) {
@@ -84,7 +133,7 @@ export default function WBSManagement() {
         }
       }
     } else if (pos === 6) { // DD 첫 번째 자리
-      const day = value + (currentDate[7] || '')
+      const day = currentDate.slice(6, 8) // DD 부분 추출
       if (day.length === 2) {
         const dayNum = parseInt(day)
         if (dayNum < 1 || dayNum > 31) {
@@ -97,7 +146,7 @@ export default function WBSManagement() {
         }
       }
     } else if (pos === 7) { // DD 두 번째 자리
-      const day = (currentDate[6] || '') + value
+      const day = currentDate.slice(6, 8) // DD 부분 추출
       if (day.length === 2) {
         const dayNum = parseInt(day)
         if (dayNum < 1 || dayNum > 31) {
@@ -112,7 +161,7 @@ export default function WBSManagement() {
     }
     return true
   }
-  
+
   // 임시 데이터 - 실제로는 API에서 가져올 예정
   const projects = [
     { id: "1", name: "웹사이트 리뉴얼 프로젝트" },
@@ -139,6 +188,38 @@ export default function WBSManagement() {
           assignee: "김분석",
           status: "완료",
           progress: 100,
+          children: [
+            {
+              id: "1-1-1",
+              name: "1.1.1 사용자 인터뷰",
+              level: 3,
+              startDate: "2024-01-01",
+              endDate: "2024-01-05",
+          assignee: "김분석",
+          status: "완료",
+          progress: 100,
+            },
+            {
+              id: "1-1-2",
+              name: "1.1.2 요구사항 정리",
+              level: 3,
+              startDate: "2024-01-06",
+              endDate: "2024-01-10",
+              assignee: "김분석",
+              status: "완료",
+              progress: 100,
+            },
+            {
+              id: "1-1-3",
+              name: "1.1.3 요구사항 검토",
+              level: 3,
+              startDate: "2024-01-11",
+              endDate: "2024-01-15",
+              assignee: "김분석",
+              status: "완료",
+              progress: 100,
+            }
+          ]
         },
         {
           id: "1-2",
@@ -149,6 +230,38 @@ export default function WBSManagement() {
           assignee: "박계획",
           status: "완료",
           progress: 100,
+          children: [
+            {
+              id: "1-2-1",
+              name: "1.2.1 WBS 작성",
+              level: 3,
+              startDate: "2024-01-16",
+              endDate: "2024-01-20",
+              assignee: "박계획",
+              status: "완료",
+              progress: 100,
+            },
+            {
+              id: "1-2-2",
+              name: "1.2.2 일정 계획",
+              level: 3,
+              startDate: "2024-01-21",
+              endDate: "2024-01-25",
+              assignee: "박계획",
+              status: "완료",
+              progress: 100,
+            },
+            {
+              id: "1-2-3",
+              name: "1.2.3 리소스 계획",
+              level: 3,
+              startDate: "2024-01-26",
+          endDate: "2024-01-31",
+          assignee: "박계획",
+          status: "완료",
+          progress: 100,
+            }
+          ]
         }
       ]
     },
@@ -170,11 +283,85 @@ export default function WBSManagement() {
           endDate: "2024-02-15",
           assignee: "이디자인",
           status: "진행중",
+          progress: 70,
+          children: [
+            {
+              id: "2-1-1",
+              name: "2.1.1 와이어프레임",
+              level: 3,
+              startDate: "2024-02-01",
+              endDate: "2024-02-05",
+              assignee: "이디자인",
+              status: "완료",
+              progress: 100,
+            },
+            {
+              id: "2-1-2",
+              name: "2.1.2 프로토타입",
+              level: 3,
+              startDate: "2024-02-06",
+              endDate: "2024-02-10",
+          assignee: "이디자인",
+          status: "진행중",
           progress: 80,
+            },
+            {
+              id: "2-1-3",
+              name: "2.1.3 디자인 시스템",
+              level: 3,
+              startDate: "2024-02-11",
+              endDate: "2024-02-15",
+              assignee: "이디자인",
+              status: "진행중",
+              progress: 50,
+            }
+          ]
         },
         {
           id: "2-2",
-          name: "2.2 프로토타입 제작",
+          name: "2.2 그래픽 디자인",
+          level: 2,
+          startDate: "2024-02-16",
+          endDate: "2024-02-28",
+          assignee: "최그래픽",
+          status: "진행중",
+          progress: 80,
+          children: [
+            {
+              id: "2-2-1",
+              name: "2.2.1 로고 디자인",
+              level: 3,
+              startDate: "2024-02-16",
+              endDate: "2024-02-20",
+              assignee: "최그래픽",
+              status: "완료",
+              progress: 100,
+            },
+            {
+              id: "2-2-2",
+              name: "2.2.2 아이콘 디자인",
+              level: 3,
+              startDate: "2024-02-21",
+              endDate: "2024-02-25",
+              assignee: "최그래픽",
+              status: "진행중",
+              progress: 60,
+            },
+            {
+              id: "2-2-3",
+              name: "2.2.3 일러스트레이션",
+              level: 3,
+              startDate: "2024-02-26",
+              endDate: "2024-02-28",
+              assignee: "최그래픽",
+              status: "진행중",
+              progress: 30,
+            }
+          ]
+        },
+        {
+          id: "2-3",
+          name: "2.3 프로토타입 제작",
           level: 2,
           startDate: "2024-02-16",
           endDate: "2024-02-28",
@@ -222,6 +409,7 @@ export default function WBSManagement() {
   const [selectedProject, setSelectedProject] = useState<string>("1")
   const [viewMode, setViewMode] = useState<'table' | 'gantt'>('table')
   const [zoomLevel, setZoomLevel] = useState<number>(1)
+  const [levelFilters, setLevelFilters] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]))
   const [tasks, setTasks] = useState<WBSTask[]>(wbsTasks)
 
   // 진행률 업데이트 함수
@@ -286,65 +474,120 @@ export default function WBSManagement() {
   // 날짜 입력 상태 관리
   const [dateInputs, setDateInputs] = useState<{[key: string]: string}>({})
 
-  // 날짜 입력 핸들러
-  const handleDateInput = (taskId: string, field: 'startDate' | 'endDate', position: number, value: string, target?: HTMLInputElement) => {
-    const key = `${taskId}-${field}`
-    const currentInput = dateInputs[key] || '        '
-    const newInput = currentInput.split('')
-    newInput[position] = value || ''
-    const newValue = newInput.join('')
-    
-    // MM 또는 DD 유효성 검사
-    if (value && (position >= 4 && position <= 7)) {
-      if (!validateDateInput(position, value, newValue)) {
-        // 유효하지 않으면 해당 부분을 비움
-        const clearedInput = currentInput.split('')
-        if (position >= 4 && position <= 5) { // MM 부분
-          clearedInput[4] = ' '
-          clearedInput[5] = ' '
-        } else if (position >= 6 && position <= 7) { // DD 부분
-          clearedInput[6] = ' '
-          clearedInput[7] = ' '
-        }
-        const clearedValue = clearedInput.join('')
-        
-        setDateInputs(prev => ({
-          ...prev,
-          [key]: clearedValue
-        }))
-        
-        // 유효성 검사 실패 시 해당 부분의 첫 번째 자리로 포커스 이동
-        setTimeout(() => {
-          const dateContainer = target.closest('.flex.items-center.gap-0')
-          const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-          if (position >= 4 && position <= 5) { // MM 부분
-            const mmFirstInput = allInputs[4] // MM 첫 번째 자리
-            if (mmFirstInput) {
-              mmFirstInput.focus()
-              mmFirstInput.select()
-            }
-          } else if (position >= 6 && position <= 7) { // DD 부분
-            const ddFirstInput = allInputs[6] // DD 첫 번째 자리
-            if (ddFirstInput) {
-              ddFirstInput.focus()
-              ddFirstInput.select()
+  // 기존 데이터를 dateInputs에 초기화
+  React.useEffect(() => {
+    const initializeDateInputs = (taskList: WBSTask[]) => {
+      const newDateInputs: {[key: string]: string} = {}
+      
+      const traverse = (tasks: WBSTask[]) => {
+        tasks.forEach(task => {
+          if (task.startDate) {
+            const dateStr = task.startDate.replace(/-/g, '')
+            for (let i = 0; i < 8; i++) {
+              const posKey = `${task.id}-startDate-${i}`
+              newDateInputs[posKey] = dateStr[i] || ''
             }
           }
-        }, 0)
-        return
+          if (task.endDate) {
+            const dateStr = task.endDate.replace(/-/g, '')
+            for (let i = 0; i < 8; i++) {
+              const posKey = `${task.id}-endDate-${i}`
+              newDateInputs[posKey] = dateStr[i] || ''
+            }
+          }
+          if (task.children) {
+            traverse(task.children)
+          }
+        })
       }
+      
+      traverse(taskList)
+      setDateInputs(newDateInputs)
     }
     
+    initializeDateInputs(tasks)
+  }, [tasks])
+
+  // 날짜 입력 핸들러 - 각 위치를 독립적으로 관리
+  const handleDateInput = (taskId: string, field: 'startDate' | 'endDate', position: number, value: string, target?: HTMLInputElement) => {
+    const key = `${taskId}-${field}-${position}`
+    
+    // 8자리 숫자가 모두 입력되었을 때만 유효성 검사
+    const allPositions = []
+    for (let i = 0; i < 8; i++) {
+      const posKey = `${taskId}-${field}-${i}`
+      allPositions[i] = i === position ? value : (dateInputs[posKey] || '')
+    }
+    const fullDate = allPositions.join('')
+    
+    
+    // 해당 위치만 업데이트
     setDateInputs(prev => ({
       ...prev,
-      [key]: newValue
+      [key]: value
     }))
     
-    // YYYY-MM-DD 형식으로 변환하여 저장
-    if (newValue.length === 8) {
-      const formatted = `${newValue.slice(0,4)}-${newValue.slice(4,6)}-${newValue.slice(6,8)}`
-      updateTaskDate(taskId, field, formatted)
-    }
+        // 8자리가 모두 숫자로 입력되었을 때만 유효성 검사
+        if (fullDate.length === 8 && allPositions.every(pos => pos !== '')) {
+          const year = fullDate.slice(0, 4)
+          const month = fullDate.slice(4, 6)
+          const day = fullDate.slice(6, 8)
+          const monthNum = parseInt(month)
+          const dayNum = parseInt(day)
+
+          let isValid = true
+
+          // 월 유효성 검사
+          if (monthNum < 1 || monthNum > 12) {
+            isValid = false
+            toast({
+              title: "유효하지 않은 월",
+              description: "월은 01-12 사이의 값이어야 합니다.",
+              variant: "destructive"
+            })
+          }
+
+          // 일 유효성 검사
+          if (dayNum < 1 || dayNum > 31) {
+            isValid = false
+            toast({
+              title: "유효하지 않은 일",
+              description: "일은 01-31 사이의 값이어야 합니다.",
+              variant: "destructive"
+            })
+          }
+
+          // 유효하지 않으면 해당 부분만 비움
+          if (!isValid) {
+            const updates: {[key: string]: string} = {}
+            
+            // 월이 유효하지 않으면 MM 부분만 비움
+            if (monthNum < 1 || monthNum > 12) {
+              for (let i = 4; i <= 5; i++) {
+                const posKey = `${taskId}-${field}-${i}`
+                updates[posKey] = ''
+              }
+            }
+            
+            // 일이 유효하지 않으면 DD 부분만 비움
+            if (dayNum < 1 || dayNum > 31) {
+              for (let i = 6; i <= 7; i++) {
+                const posKey = `${taskId}-${field}-${i}`
+                updates[posKey] = ''
+              }
+            }
+
+            setDateInputs(prev => ({
+              ...prev,
+              ...updates
+            }))
+            return
+          }
+
+          // 유효하면 YYYY-MM-DD 형식으로 저장
+          const formatted = `${fullDate.slice(0,4)}-${fullDate.slice(4,6)}-${fullDate.slice(6,8)}`
+          updateTaskDate(taskId, field, formatted)
+        }
   }
 
   const getStatusColor = (status: string) => {
@@ -411,21 +654,26 @@ export default function WBSManagement() {
     
     const traverse = (taskList: WBSTask[], depth: number = 0) => {
       taskList.forEach(task => {
-        allTasks.push({
-          id: task.id,
-          name: task.name,
-          startDate: task.startDate,
-          endDate: task.endDate,
-          progress: task.progress,
-          assignee: task.assignee,
-          status: task.status,
-          level: task.level,
-          depth: depth,
-          hasChildren: task.children && task.children.length > 0,
-          color: task.level === 3 ? "bg-blue-200" : task.level === 2 ? "bg-green-200" : "bg-gray-200"
-        })
+        // 현재 레벨이 필터에 포함되어 있으면 표시
+        if (levelFilters.has(task.level)) {
+          const themeColor = getThemeColor(task.id, task.level)
+          allTasks.push({
+            id: task.id,
+            name: task.name,
+            startDate: task.startDate,
+            endDate: task.endDate,
+            progress: task.progress,
+            assignee: task.assignee,
+            status: task.status,
+            level: task.level,
+            depth: depth,
+            hasChildren: task.children && task.children.length > 0,
+            color: themeColor
+          })
+        }
         
         // 하위 항목이 있고 펼쳐진 상태인 경우에만 추가
+        // 상위 레벨이 숨겨져도 하위 레벨은 표시 가능
         if (task.children && expandedTasks.has(task.id)) {
           traverse(task.children, depth + 1)
         }
@@ -444,6 +692,17 @@ export default function WBSManagement() {
       newExpanded.add(taskId)
     }
     setExpandedTasks(newExpanded)
+  }
+
+  // 레벨 필터 토글 함수
+  const toggleLevelFilter = (level: number) => {
+    const newFilters = new Set(levelFilters)
+    if (newFilters.has(level)) {
+      newFilters.delete(level)
+    } else {
+      newFilters.add(level)
+    }
+    setLevelFilters(newFilters)
   }
 
   // 모든 작업을 평면적으로 추출하는 함수 (표 뷰용)
@@ -483,7 +742,10 @@ export default function WBSManagement() {
         {/* L1 */}
         <div className="w-[16px] flex justify-center overflow-visible">
           {getLevelValue(1) && !getLevelValue(2) && (
-            <div className="w-4 h-4 bg-blue-500 rounded-full">
+            <div 
+              className="w-4 h-4 rounded-full border border-gray-300"
+              style={{ backgroundColor: getThemeColor(task.id, 1) }}
+            >
             </div>
           )}
         </div>
@@ -491,31 +753,43 @@ export default function WBSManagement() {
         {/* L2 */}
         <div className="w-[16px] flex justify-center overflow-visible">
           {getLevelValue(2) && !getLevelValue(3) && (
-            <div className="w-4 h-4 bg-green-500 rounded-full">
+            <div 
+              className="w-4 h-4 rounded-full border border-gray-300"
+              style={{ backgroundColor: getThemeColor(task.id, 2) }}
+            >
             </div>
-          )}
-        </div>
-        
+            )}
+          </div>
+
         {/* L3 */}
         <div className="w-[16px] flex justify-center overflow-visible">
           {getLevelValue(3) && !getLevelValue(4) && (
-            <div className="w-4 h-4 bg-orange-500 rounded-full">
-            </div>
-          )}
-        </div>
-        
+            <div 
+              className="w-4 h-4 rounded-full border border-gray-300"
+              style={{ backgroundColor: getThemeColor(task.id, 3) }}
+            >
+              </div>
+            )}
+          </div>
+
         {/* L4 */}
         <div className="w-[16px] flex justify-center overflow-visible">
           {getLevelValue(4) && !getLevelValue(5) && (
-            <div className="w-4 h-4 bg-purple-500 rounded-full">
-            </div>
+            <div 
+              className="w-4 h-4 rounded-full border border-gray-300"
+              style={{ backgroundColor: getThemeColor(task.id, 4) }}
+            >
+              </div>
           )}
-        </div>
-        
+            </div>
+            
         {/* L5 */}
         <div className="w-[16px] flex justify-center overflow-visible">
           {getLevelValue(5) && (
-            <div className="w-4 h-4 bg-pink-500 rounded-full">
+            <div 
+              className="w-4 h-4 rounded-full border border-gray-300"
+              style={{ backgroundColor: getThemeColor(task.id, 5) }}
+            >
             </div>
           )}
         </div>
@@ -534,7 +808,6 @@ export default function WBSManagement() {
             value={task.status}
             onChange={(e) => {
               // 여기서 실제 데이터 업데이트 로직을 추가해야 합니다
-              console.log(`Task ${task.id} status updated to ${e.target.value}`)
             }}
             className="px-3 py-2 text-xs font-medium rounded-lg bg-gray-100 hover:bg-gray-200 focus:bg-white focus:outline-none transition-all duration-200 cursor-pointer custom-dropdown"
             style={{
@@ -554,15 +827,15 @@ export default function WBSManagement() {
         
         {/* 시작일 */}
         <div className="flex-1 flex items-center gap-1">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <div className="flex items-center gap-0">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+          <div className="flex items-center gap-0 relative">
             {/* YYYY */}
             {[0, 1, 2, 3].map(pos => (
               <input
                 key={pos}
                 type="text"
                 maxLength={1}
-                value={dateInputs[`${task.id}-startDate`]?.[pos] || ''}
+                value={dateInputs[`${task.id}-startDate-${pos}`] || ''}
                 onClick={(e) => {
                   const target = e.target as HTMLInputElement
                   target.focus()
@@ -571,39 +844,32 @@ export default function WBSManagement() {
                 onChange={(e) => {
                   const target = e.target as HTMLInputElement
                   const value = target.value.replace(/[^0-9]/g, '')
-                  if (value.length <= 1) {
-                    handleDateInput(task.id, 'startDate', pos, value, target)
-                  }
+                  handleDateInput(task.id, 'startDate', pos, value, target)
                 }}
                 onInput={(e) => {
                   const target = e.target as HTMLInputElement
                   const value = target.value.replace(/[^0-9]/g, '')
-                  if (value.length <= 1) {
-                    handleDateInput(task.id, 'startDate', pos, value, target)
-                    // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
-                    if (value && pos < 7) {
-                      setTimeout(() => {
-                        // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
-                        const dateContainer = target.closest('.flex.items-center.gap-0')
-                        const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                        const currentIndex = Array.from(allInputs).indexOf(target)
-                        const nextInput = allInputs[currentIndex + 1]
-                        console.log('Debug - pos:', pos, 'currentIndex:', currentIndex, 'allInputs.length:', allInputs?.length, 'nextInput:', nextInput)
-                        if (nextInput) {
-                          nextInput.focus()
-                          nextInput.select()
-                          console.log('Debug - Focus moved to next input')
-                        } else {
-                          console.log('Debug - No next input found')
-                        }
-                      }, 0)
-                    }
+                  handleDateInput(task.id, 'startDate', pos, value, target)
+                  // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
+                  if (value && pos < 7) {
+                    setTimeout(() => {
+                      // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
+                      const dateContainer = target.closest('.flex.items-center.gap-0')
+                      const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
+                      const currentIndex = Array.from(allInputs).indexOf(target)
+                      const nextInput = allInputs[currentIndex + 1]
+                      if (nextInput) {
+                        nextInput.focus()
+                        nextInput.select()
+                      }
+                    }, 0)
                   }
                 }}
                 onKeyDown={(e) => {
                   const target = e.target as HTMLInputElement
                   if (e.key === 'Backspace' && !target.value && pos > 0) {
                     // 이전 자리로 이동
+                    e.preventDefault()
                     const dateContainer = target.closest('.flex.items-center.gap-0')
                     const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
                     const currentIndex = Array.from(allInputs).indexOf(target)
@@ -636,8 +902,8 @@ export default function WBSManagement() {
                     }
                   }
                 }}
-                className="w-2 h-6 text-center text-xs font-mono p-0"
-                placeholder={pos === 0 ? 'Y' : pos === 1 ? 'Y' : pos === 2 ? 'Y' : 'Y'}
+                className="w-2 h-6 text-center text-xs font-mono p-0 relative z-10"
+                placeholder={pos === 0 ? 'Y' : pos === 1 ? 'Y' : pos === 2 ? 'Y' : pos === 3 ? 'Y' : pos === 4 ? 'M' : pos === 5 ? 'M' : pos === 6 ? 'D' : pos === 7 ? 'D' : ''}
               />
             ))}
             <span className="text-gray-400">-</span>
@@ -647,7 +913,7 @@ export default function WBSManagement() {
                 key={pos}
                 type="text"
                 maxLength={1}
-                value={dateInputs[`${task.id}-startDate`]?.[pos] || ''}
+                value={dateInputs[`${task.id}-startDate-${pos}`] || ''}
                 onClick={(e) => {
                   const target = e.target as HTMLInputElement
                   target.focus()
@@ -656,39 +922,32 @@ export default function WBSManagement() {
                 onChange={(e) => {
                   const target = e.target as HTMLInputElement
                   const value = target.value.replace(/[^0-9]/g, '')
-                  if (value.length <= 1) {
-                    handleDateInput(task.id, 'startDate', pos, value, target)
-                  }
+                  handleDateInput(task.id, 'startDate', pos, value, target)
                 }}
                 onInput={(e) => {
                   const target = e.target as HTMLInputElement
                   const value = target.value.replace(/[^0-9]/g, '')
-                  if (value.length <= 1) {
-                    handleDateInput(task.id, 'startDate', pos, value, target)
-                    // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
-                    if (value && pos < 7) {
-                      setTimeout(() => {
-                        // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
-                        const dateContainer = target.closest('.flex.items-center.gap-0')
-                        const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                        const currentIndex = Array.from(allInputs).indexOf(target)
-                        const nextInput = allInputs[currentIndex + 1]
-                        console.log('Debug - pos:', pos, 'currentIndex:', currentIndex, 'allInputs.length:', allInputs?.length, 'nextInput:', nextInput)
-                        if (nextInput) {
-                          nextInput.focus()
-                          nextInput.select()
-                          console.log('Debug - Focus moved to next input')
-                        } else {
-                          console.log('Debug - No next input found')
-                        }
-                      }, 0)
-                    }
+                  handleDateInput(task.id, 'startDate', pos, value, target)
+                  // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
+                  if (value && pos < 7) {
+                    setTimeout(() => {
+                      // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
+                      const dateContainer = target.closest('.flex.items-center.gap-0')
+                      const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
+                      const currentIndex = Array.from(allInputs).indexOf(target)
+                      const nextInput = allInputs[currentIndex + 1]
+                      if (nextInput) {
+                        nextInput.focus()
+                        nextInput.select()
+                      }
+                    }, 0)
                   }
                 }}
                 onKeyDown={(e) => {
                   const target = e.target as HTMLInputElement
                   if (e.key === 'Backspace' && !target.value && pos > 0) {
                     // 이전 자리로 이동
+                    e.preventDefault()
                     const dateContainer = target.closest('.flex.items-center.gap-0')
                     const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
                     const currentIndex = Array.from(allInputs).indexOf(target)
@@ -721,8 +980,8 @@ export default function WBSManagement() {
                     }
                   }
                 }}
-                className="w-2 h-6 text-center text-xs font-mono p-0"
-                placeholder={pos === 4 ? 'M' : 'M'}
+                className="w-2 h-6 text-center text-xs font-mono p-0 relative z-10"
+                placeholder={pos === 0 ? 'Y' : pos === 1 ? 'Y' : pos === 2 ? 'Y' : pos === 3 ? 'Y' : pos === 4 ? 'M' : pos === 5 ? 'M' : pos === 6 ? 'D' : pos === 7 ? 'D' : ''}
               />
             ))}
             <span className="text-gray-400">-</span>
@@ -732,7 +991,7 @@ export default function WBSManagement() {
                 key={pos}
                 type="text"
                 maxLength={1}
-                value={dateInputs[`${task.id}-startDate`]?.[pos] || ''}
+                value={dateInputs[`${task.id}-startDate-${pos}`] || ''}
                 onClick={(e) => {
                   const target = e.target as HTMLInputElement
                   target.focus()
@@ -741,39 +1000,32 @@ export default function WBSManagement() {
                 onChange={(e) => {
                   const target = e.target as HTMLInputElement
                   const value = target.value.replace(/[^0-9]/g, '')
-                  if (value.length <= 1) {
-                    handleDateInput(task.id, 'startDate', pos, value, target)
-                  }
+                  handleDateInput(task.id, 'startDate', pos, value, target)
                 }}
                 onInput={(e) => {
                   const target = e.target as HTMLInputElement
                   const value = target.value.replace(/[^0-9]/g, '')
-                  if (value.length <= 1) {
-                    handleDateInput(task.id, 'startDate', pos, value, target)
-                    // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
-                    if (value && pos < 7) {
-                      setTimeout(() => {
-                        // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
-                        const dateContainer = target.closest('.flex.items-center.gap-0')
-                        const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                        const currentIndex = Array.from(allInputs).indexOf(target)
-                        const nextInput = allInputs[currentIndex + 1]
-                        console.log('Debug - pos:', pos, 'currentIndex:', currentIndex, 'allInputs.length:', allInputs?.length, 'nextInput:', nextInput)
-                        if (nextInput) {
-                          nextInput.focus()
-                          nextInput.select()
-                          console.log('Debug - Focus moved to next input')
-                        } else {
-                          console.log('Debug - No next input found')
-                        }
-                      }, 0)
-                    }
+                  handleDateInput(task.id, 'startDate', pos, value, target)
+                  // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
+                  if (value && pos < 7) {
+                    setTimeout(() => {
+                      // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
+                      const dateContainer = target.closest('.flex.items-center.gap-0')
+                      const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
+                      const currentIndex = Array.from(allInputs).indexOf(target)
+                      const nextInput = allInputs[currentIndex + 1]
+                      if (nextInput) {
+                        nextInput.focus()
+                        nextInput.select()
+                      }
+                    }, 0)
                   }
                 }}
                 onKeyDown={(e) => {
                   const target = e.target as HTMLInputElement
                   if (e.key === 'Backspace' && !target.value && pos > 0) {
                     // 이전 자리로 이동
+                    e.preventDefault()
                     const dateContainer = target.closest('.flex.items-center.gap-0')
                     const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
                     const currentIndex = Array.from(allInputs).indexOf(target)
@@ -806,24 +1058,24 @@ export default function WBSManagement() {
                     }
                   }
                 }}
-                className="w-2 h-6 text-center text-xs font-mono p-0"
-                placeholder={pos === 6 ? 'D' : 'D'}
+                className="w-2 h-6 text-center text-xs font-mono p-0 relative z-10"
+                placeholder={pos === 6 ? 'D' : pos === 7 ? 'D' : ''}
               />
             ))}
           </div>
-        </div>
-        
+            </div>
+            
         {/* 종료일 */}
         <div className="flex-1 flex items-center gap-1">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <div className="flex items-center gap-0">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+          <div className="flex items-center gap-0 relative">
             {/* YYYY */}
             {[0, 1, 2, 3].map(pos => (
               <input
                 key={pos}
                 type="text"
                 maxLength={1}
-                value={dateInputs[`${task.id}-endDate`]?.[pos] || ''}
+                value={dateInputs[`${task.id}-endDate-${pos}`] || ''}
                 onClick={(e) => {
                   const target = e.target as HTMLInputElement
                   target.focus()
@@ -832,32 +1084,13 @@ export default function WBSManagement() {
                 onChange={(e) => {
                   const target = e.target as HTMLInputElement
                   const value = target.value.replace(/[^0-9]/g, '')
-                  if (value.length <= 1) {
-                    handleDateInput(task.id, 'endDate', pos, value, target)
-                    // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
-                    if (value && pos < 7) {
-                      setTimeout(() => {
-                        // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
-                        const dateContainer = target.closest('.flex.items-center.gap-0')
-                        const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                        const currentIndex = Array.from(allInputs).indexOf(target)
-                        const nextInput = allInputs[currentIndex + 1]
-                        console.log('Debug - pos:', pos, 'currentIndex:', currentIndex, 'allInputs.length:', allInputs?.length, 'nextInput:', nextInput)
-                        if (nextInput) {
-                          nextInput.focus()
-                          nextInput.select()
-                          console.log('Debug - Focus moved to next input')
-                        } else {
-                          console.log('Debug - No next input found')
-                        }
-                      }, 0)
-                    }
-                  }
+                  handleDateInput(task.id, 'endDate', pos, value, target)
                 }}
                 onKeyDown={(e) => {
                   const target = e.target as HTMLInputElement
                   if (e.key === 'Backspace' && !target.value && pos > 0) {
                     // 이전 자리로 이동
+                    e.preventDefault()
                     const dateContainer = target.closest('.flex.items-center.gap-0')
                     const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
                     const currentIndex = Array.from(allInputs).indexOf(target)
@@ -890,8 +1123,8 @@ export default function WBSManagement() {
                     }
                   }
                 }}
-                className="w-2 h-6 text-center text-xs font-mono p-0"
-                placeholder={pos === 0 ? 'Y' : pos === 1 ? 'Y' : pos === 2 ? 'Y' : 'Y'}
+                className="w-2 h-6 text-center text-xs font-mono p-0 relative z-10"
+                placeholder={pos === 0 ? 'Y' : pos === 1 ? 'Y' : pos === 2 ? 'Y' : pos === 3 ? 'Y' : pos === 4 ? 'M' : pos === 5 ? 'M' : pos === 6 ? 'D' : pos === 7 ? 'D' : ''}
               />
             ))}
             <span className="text-gray-400">-</span>
@@ -901,7 +1134,7 @@ export default function WBSManagement() {
                 key={pos}
                 type="text"
                 maxLength={1}
-                value={dateInputs[`${task.id}-endDate`]?.[pos] || ''}
+                value={dateInputs[`${task.id}-endDate-${pos}`] || ''}
                 onClick={(e) => {
                   const target = e.target as HTMLInputElement
                   target.focus()
@@ -910,32 +1143,13 @@ export default function WBSManagement() {
                 onChange={(e) => {
                   const target = e.target as HTMLInputElement
                   const value = target.value.replace(/[^0-9]/g, '')
-                  if (value.length <= 1) {
-                    handleDateInput(task.id, 'endDate', pos, value, target)
-                    // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
-                    if (value && pos < 7) {
-                      setTimeout(() => {
-                        // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
-                        const dateContainer = target.closest('.flex.items-center.gap-0')
-                        const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                        const currentIndex = Array.from(allInputs).indexOf(target)
-                        const nextInput = allInputs[currentIndex + 1]
-                        console.log('Debug - pos:', pos, 'currentIndex:', currentIndex, 'allInputs.length:', allInputs?.length, 'nextInput:', nextInput)
-                        if (nextInput) {
-                          nextInput.focus()
-                          nextInput.select()
-                          console.log('Debug - Focus moved to next input')
-                        } else {
-                          console.log('Debug - No next input found')
-                        }
-                      }, 0)
-                    }
-                  }
+                  handleDateInput(task.id, 'endDate', pos, value, target)
                 }}
                 onKeyDown={(e) => {
                   const target = e.target as HTMLInputElement
                   if (e.key === 'Backspace' && !target.value && pos > 0) {
                     // 이전 자리로 이동
+                    e.preventDefault()
                     const dateContainer = target.closest('.flex.items-center.gap-0')
                     const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
                     const currentIndex = Array.from(allInputs).indexOf(target)
@@ -968,8 +1182,8 @@ export default function WBSManagement() {
                     }
                   }
                 }}
-                className="w-2 h-6 text-center text-xs font-mono p-0"
-                placeholder={pos === 4 ? 'M' : 'M'}
+                className="w-2 h-6 text-center text-xs font-mono p-0 relative z-10"
+                placeholder={pos === 0 ? 'Y' : pos === 1 ? 'Y' : pos === 2 ? 'Y' : pos === 3 ? 'Y' : pos === 4 ? 'M' : pos === 5 ? 'M' : pos === 6 ? 'D' : pos === 7 ? 'D' : ''}
               />
             ))}
             <span className="text-gray-400">-</span>
@@ -979,7 +1193,7 @@ export default function WBSManagement() {
                 key={pos}
                 type="text"
                 maxLength={1}
-                value={dateInputs[`${task.id}-endDate`]?.[pos] || ''}
+                value={dateInputs[`${task.id}-endDate-${pos}`] || ''}
                 onClick={(e) => {
                   const target = e.target as HTMLInputElement
                   target.focus()
@@ -988,32 +1202,13 @@ export default function WBSManagement() {
                 onChange={(e) => {
                   const target = e.target as HTMLInputElement
                   const value = target.value.replace(/[^0-9]/g, '')
-                  if (value.length <= 1) {
-                    handleDateInput(task.id, 'endDate', pos, value, target)
-                    // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
-                    if (value && pos < 7) {
-                      setTimeout(() => {
-                        // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
-                        const dateContainer = target.closest('.flex.items-center.gap-0')
-                        const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                        const currentIndex = Array.from(allInputs).indexOf(target)
-                        const nextInput = allInputs[currentIndex + 1]
-                        console.log('Debug - pos:', pos, 'currentIndex:', currentIndex, 'allInputs.length:', allInputs?.length, 'nextInput:', nextInput)
-                        if (nextInput) {
-                          nextInput.focus()
-                          nextInput.select()
-                          console.log('Debug - Focus moved to next input')
-                        } else {
-                          console.log('Debug - No next input found')
-                        }
-                      }, 0)
-                    }
-                  }
+                  handleDateInput(task.id, 'endDate', pos, value, target)
                 }}
                 onKeyDown={(e) => {
                   const target = e.target as HTMLInputElement
                   if (e.key === 'Backspace' && !target.value && pos > 0) {
                     // 이전 자리로 이동
+                    e.preventDefault()
                     const dateContainer = target.closest('.flex.items-center.gap-0')
                     const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
                     const currentIndex = Array.from(allInputs).indexOf(target)
@@ -1046,28 +1241,28 @@ export default function WBSManagement() {
                     }
                   }
                 }}
-                className="w-2 h-6 text-center text-xs font-mono p-0"
-                placeholder={pos === 6 ? 'D' : 'D'}
+                className="w-2 h-6 text-center text-xs font-mono p-0 relative z-10"
+                placeholder={pos === 6 ? 'D' : pos === 7 ? 'D' : ''}
               />
             ))}
           </div>
-        </div>
-        
+            </div>
+            
         {/* 담당자 */}
         <div className="flex-1 flex items-center gap-2">
-          <User className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm">{task.assignee}</span>
-        </div>
-        
+              <User className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm">{task.assignee}</span>
+            </div>
+            
         {/* 진행률 게이지 + 입력 */}
         <div className="flex-1 flex items-center gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-16 bg-gray-200 rounded-full h-2">
-              <div
-                className={`h-2 rounded-full ${getProgressColor(task.progress)}`}
-                style={{ width: `${task.progress}%` }}
-              />
-            </div>
+              <div className="flex items-center gap-2">
+                <div className="w-16 bg-gray-200 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${getProgressColor(task.progress)}`}
+                    style={{ width: `${task.progress}%` }}
+                  />
+                </div>
             <div className="flex items-center gap-0">
               <input
                 type="number"
@@ -1084,9 +1279,9 @@ export default function WBSManagement() {
                 className="w-12 px-1 py-1 text-xs border border-gray-300 rounded text-center"
               />
               <span className="text-xs text-muted-foreground">%</span>
+              </div>
             </div>
           </div>
-        </div>
       </div>
     )
   }
@@ -1096,13 +1291,13 @@ export default function WBSManagement() {
       <style dangerouslySetInnerHTML={{ __html: dropdownStyles }} />
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <BarChart3 className="w-8 h-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">WBS 관리</h1>
-            <p className="text-muted-foreground">프로젝트 작업 분할 구조(WBS)를 관리할 수 있습니다.</p>
-          </div>
+        <BarChart3 className="w-8 h-8 text-primary" />
+        <div>
+          <h1 className="text-3xl font-bold">WBS 관리</h1>
+          <p className="text-muted-foreground">프로젝트 작업 분할 구조(WBS)를 관리할 수 있습니다.</p>
         </div>
-        
+      </div>
+
         {/* 뷰 모드 토글 */}
         <div className="flex items-center border rounded-lg">
           <Button
@@ -1113,7 +1308,7 @@ export default function WBSManagement() {
           >
             <Table className="w-4 h-4 mr-2" />
             표
-          </Button>
+            </Button>
           <Button
             variant={viewMode === 'gantt' ? 'default' : 'ghost'}
             size="sm"
@@ -1122,9 +1317,9 @@ export default function WBSManagement() {
           >
             <GanttChart className="w-4 h-4 mr-2" />
             간트차트
-          </Button>
-        </div>
-      </div>
+            </Button>
+          </div>
+          </div>
 
       {/* 통계 정보 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1207,37 +1402,62 @@ export default function WBSManagement() {
           ) : (
             /* 간트차트 뷰 */
             <div className="space-y-4">
-              {/* 간트차트 컨트롤 */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-4">
+              {/* 컨트롤 섹션 - 가로 배열 */}
+              <div className="p-4 bg-white border border-gray-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  {/* 필터 컨트롤 - 좌측 */}
                   <div className="flex items-center gap-2">
                     <Filter className="w-4 h-4" />
-                    <span className="text-sm font-medium">줌:</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.1))}
-                    >
-                      <ZoomOut className="w-4 h-4" />
-                    </Button>
-                    <span className="text-sm w-12 text-center">{Math.round(zoomLevel * 100)}%</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setZoomLevel(Math.min(2, zoomLevel + 0.1))}
-                    >
-                      <ZoomIn className="w-4 h-4" />
+                    <span className="text-sm font-medium">레벨 필터:</span>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map(level => (
+                        <Button
+                          key={level}
+                          variant={levelFilters.has(level) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => toggleLevelFilter(level)}
+                          className="w-8 h-8 p-0"
+                        >
+                          L{level}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 줌 컨트롤 + 내보내기 - 우측 */}
+                  <div className="flex items-center gap-6">
+                    {/* 줌 컨트롤 */}
+                    <div className="flex items-center gap-2">
+                      <Search className="w-4 h-4" />
+                      <span className="text-sm font-medium">줌:</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.1))}
+                      >
+                        <Minus className="w-4 h-4" />
+                      </Button>
+                      <span className="text-sm w-12 text-center">{Math.round(zoomLevel * 100)}%</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setZoomLevel(Math.min(2, zoomLevel + 0.1))}
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    {/* 내보내기 */}
+                    <Button variant="outline" size="sm">
+                      <Download className="w-4 h-4 mr-2" />
+                      내보내기
                     </Button>
                   </div>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Download className="w-4 h-4 mr-2" />
-                  내보내기
-                </Button>
               </div>
 
               {/* 간트차트 */}
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overflow-y-visible">
                 <div 
                   className="inline-block" 
                   style={{ 
@@ -1251,72 +1471,88 @@ export default function WBSManagement() {
                     <div className="w-64 p-3 font-medium bg-gray-50 border-r border-gray-200 flex-shrink-0">
                       작업명
                     </div>
-                    <div className="flex-1 p-3 font-medium bg-gray-50">
-                      <div className="text-sm">타임라인 (2024년 1월 ~ 5월)</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        최하위 작업만 표시됩니다
+                    <div className="flex-1 bg-gray-50">
+                      {/* 월별 헤더 */}
+                      <div className="relative">
+                        {months.map((month, index) => {
+                          const monthStart = new Date(month.year, month.month - 1, 1)
+                          const baseDate = new Date('2024-01-01')
+                          const monthStartDays = Math.floor((monthStart.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24))
+                          const monthPosition = (monthStartDays / 150) * 100
+                          
+                          // 다음 월의 시작 위치 계산 (마지막 월 제외)
+                          const nextMonthStart = index < months.length - 1 ? 
+                            new Date(months[index + 1].year, months[index + 1].month - 1, 1) :
+                            new Date(month.year, month.month, 1) // 현재 월의 다음 달 1일
+                          const nextMonthStartDays = Math.floor((nextMonthStart.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24))
+                          const nextMonthPosition = (nextMonthStartDays / 150) * 100
+                          
+                          const monthWidth = nextMonthPosition - monthPosition
+                          
+                          return (
+                            <div
+                              key={`${month.year}-${month.month}`}
+                              className="absolute top-0 p-2 text-center border-r border-gray-300"
+                              style={{ 
+                                left: `${monthPosition}%`,
+                                width: `${monthWidth}%`,
+                                height: '100%'
+                              }}
+                            >
+                              <div className="text-sm font-medium">{month.label}</div>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
                   </div>
 
                   {/* 작업 행들 */}
-                  {convertToGanttTasks(wbsTasks).map((task) => (
+                  {convertToGanttTasks(tasks).map((task) => (
                     <div key={task.id} className="flex border-b border-gray-200 hover:bg-gray-50">
                       {/* 작업 정보 */}
                       <div className="w-64 p-3 border-r border-gray-200 flex-shrink-0">
                         <div className="flex items-center">
                           {/* 들여쓰기 */}
-                          <div style={{ paddingLeft: `${task.depth * 20}px` }} className="flex items-center">
+                          <div style={{ paddingLeft: `${task.depth * 20}px` }} className="flex items-center relative z-10">
                             {/* 접기/펼치기 버튼 */}
                             {task.hasChildren ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="w-6 h-6 p-0 mr-2"
-                                onClick={() => toggleTask(task.id)}
+                              <button
+                                className="w-6 h-6 mr-2 flex items-center justify-center hover:bg-gray-200 rounded border border-gray-300 bg-white cursor-pointer relative"
+                                style={{ zIndex: 9999 }}
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  toggleTask(task.id)
+                                }}
                               >
                                 {expandedTasks.has(task.id) ? (
                                   <ChevronDown className="w-4 h-4" />
                                 ) : (
                                   <ChevronRight className="w-4 h-4" />
                                 )}
-                              </Button>
+                              </button>
                             ) : (
                               <div className="w-6 h-6 mr-2" />
                             )}
                             
                             {/* 작업명 */}
-                            <div className="flex-1">
-                              <div className={`font-medium text-sm ${
-                                task.level === 3 ? 'text-blue-600' : 
-                                task.level === 2 ? 'text-green-600' : 
-                                'text-gray-700'
-                              }`}>
-                                {task.name}
+                              <div className="flex-1">
+                                <div className={`font-medium text-sm ${
+                                  task.level === 3 ? 'text-blue-600' : 
+                                  task.level === 2 ? 'text-green-600' : 
+                                  'text-gray-700'
+                                }`}>
+                                  {task.name}
+                                </div>
                               </div>
-                              {task.level === 3 && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  담당: {task.assignee}
-                                </div>
-                              )}
-                              {task.level === 3 && (
-                                <div className="flex items-center gap-2 mt-2">
-                                  <Badge className={getStatusColor(task.status)} variant="secondary">
-                                    {task.status}
-                                  </Badge>
-                                  <div className="text-xs text-muted-foreground">
-                                    {task.progress}%
-                                  </div>
-                                </div>
-                              )}
-                            </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* 타임라인 바 - 최하위 항목만 */}
-                      {task.level === 3 ? (
-                        <div className="flex-1 relative h-8 bg-gray-50">
+                      {/* 타임라인 바 - 최하위 항목만 (하위 작업이 없는 항목) */}
+                      {!task.hasChildren ? (
+                        <div className="flex-1 relative h-8 bg-gray-50 overflow-visible">
                           {/* 전체 타임라인 배경 */}
                           <div className="absolute inset-0 flex">
                             {months.map((month, index) => {
@@ -1337,14 +1573,23 @@ export default function WBSManagement() {
                           
                           {/* 작업 막대 */}
                           <div
-                            className={`absolute top-1 h-6 rounded ${task.color} opacity-80 flex items-center justify-center`}
+                            className="absolute top-1 h-6 rounded opacity-80 flex items-center justify-center border border-gray-300"
                             style={{
                               left: calculateTaskPosition(task.startDate, task.endDate).left,
                               width: calculateTaskPosition(task.startDate, task.endDate).width,
-                              minWidth: '20px' // 최소 너비 보장
+                              minWidth: '20px', // 최소 너비 보장
+                              backgroundColor: task.color,
+                              overflow: 'visible'
                             }}
                           >
-                            <span className="text-xs text-gray-800 font-medium truncate px-1">
+                            <span 
+                              className="text-xs text-gray-800 font-medium px-1 whitespace-nowrap"
+                              style={{
+                                overflow: 'visible',
+                                textOverflow: 'unset',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
                               {task.name}
                             </span>
                           </div>
