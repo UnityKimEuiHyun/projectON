@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft, Save, User, Mail, Phone, Building2, ExternalLink } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useNavigate } from 'react-router-dom'
-import { AffiliationService } from '@/services/affiliationService'
 
 export default function ProfileEdit() {
   const { user, userProfile, refreshUserProfile } = useAuth()
@@ -57,11 +56,30 @@ export default function ProfileEdit() {
       if (!user) return
       
       try {
-        const affiliations = await AffiliationService.getUserAffiliations(user.id)
-        if (affiliations.length > 0) {
+        const { data: affiliations, error } = await supabase
+          .from('group_members')
+          .select(`
+            groups (
+              id,
+              name,
+              description,
+              created_at,
+              updated_at
+            )
+          `)
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+        
+        if (error) {
+          console.error('❌ 소속 기업 정보 가져오기 실패:', error)
+          return
+        }
+        
+        const affiliationsData = affiliations?.map(item => item.groups).filter(Boolean) || []
+        if (affiliationsData.length > 0) {
           setUserCompany({
-            name: affiliations[0].name,
-            description: affiliations[0].description || ''
+            name: affiliationsData[0].name,
+            description: affiliationsData[0].description || ''
           })
         }
       } catch (error) {

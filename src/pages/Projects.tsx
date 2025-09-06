@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,7 +15,8 @@ import {
   Loader2,
   Check,
   CheckCircle,
-  Circle
+  Circle,
+  Star
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -25,6 +27,7 @@ import {
 import { ProjectDetailModal } from "@/components/ProjectDetailModal"
 import { ProjectCreateModal } from "@/components/ProjectCreateModal"
 import { ProjectService } from "@/services/projectService"
+import { FavoriteService } from "@/services/favoriteService"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/useAuth"
 import { supabase } from "@/integrations/supabase/client"
@@ -32,16 +35,203 @@ import { supabase } from "@/integrations/supabase/client"
 import type { Database } from '@/integrations/supabase/types'
 
 type Project = Database['public']['Tables']['projects']['Row']
-type Group = Database['public']['Tables']['groups']['Row']
-type GroupMember = Database['public']['Tables']['group_members']['Row']
+
+// 프로젝트 카드 컴포넌트
+interface ProjectCardProps {
+  project: Project
+  selectedProjects: Set<string>
+  favoriteProjects: Set<string>
+  openProject: Project | null
+  onProjectToggle: (project: Project) => void
+  onToggleFavorite: (projectId: string) => void
+  onEditProject: (project: Project) => void
+  onViewProject: (project: Project) => void
+  onDeleteProject: (project: Project) => void
+  canDeleteProject: (project: Project) => boolean
+}
+
+const ProjectCard = ({
+  project,
+  selectedProjects,
+  favoriteProjects,
+  openProject,
+  onProjectToggle,
+  onToggleFavorite,
+  onEditProject,
+  onViewProject,
+  onDeleteProject,
+  canDeleteProject
+}: ProjectCardProps) => {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "진행중":
+        return "bg-green-100 text-green-800"
+      case "완료":
+        return "bg-blue-100 text-blue-800"
+      case "대기중":
+        return "bg-yellow-100 text-yellow-800"
+      case "계획중":
+        return "bg-gray-100 text-gray-800"
+      default:
+        return "text-muted-foreground"
+    }
+  }
+
+  return (
+    <Card 
+      className={`hover:shadow-md transition-all duration-200 ${
+        selectedProjects.has(project.id)
+          ? 'ring-2 ring-primary bg-primary/5 shadow-lg' 
+          : 'hover:shadow-lg'
+      }`}
+    >
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div className="space-y-1 flex-1">
+            <CardTitle className="text-lg">{project.name}</CardTitle>
+            <CardDescription className="text-sm">
+              {project.description}
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* 즐겨찾기 버튼 */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-8 w-8 ${
+                favoriteProjects.has(project.id)
+                  ? 'text-yellow-500 hover:text-yellow-600' 
+                  : 'text-muted-foreground hover:text-yellow-500'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleFavorite(project.id)
+              }}
+              title={favoriteProjects.has(project.id) ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+            >
+              <Star className={`h-5 w-5 ${favoriteProjects.has(project.id) ? 'fill-current' : ''}`} />
+            </Button>
+            
+            {/* 프로젝트 체크박스 */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-8 w-8 ${
+                selectedProjects.has(project.id)
+                  ? 'text-primary hover:text-primary' 
+                  : 'text-muted-foreground hover:text-primary'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation()
+                onProjectToggle(project)
+              }}
+              title={selectedProjects.has(project.id) ? "선택 해제" : "프로젝트 선택"}
+            >
+              {selectedProjects.has(project.id) ? (
+                <CheckCircle className="h-5 w-5" />
+              ) : (
+                <Circle className="h-5 w-5" />
+              )}
+            </Button>
+            {canDeleteProject(project) && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDeleteProject(project)
+                }}
+                title="프로젝트 삭제"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Badge className={getStatusColor(project.status)}>
+              {project.status}
+            </Badge>
+            <div className="flex items-center text-sm text-muted-foreground">
+              <Calendar className="h-4 w-4 mr-1" />
+              {project.due_date ? new Date(project.due_date).toLocaleDateString() : '마감일 없음'}
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">진행률</span>
+              <span className="font-medium">{project.progress}%</span>
+            </div>
+            <Progress value={project.progress} className="h-2" />
+          </div>
+          
+          <div className="flex items-center text-sm text-muted-foreground">
+            <Users className="h-4 w-4 mr-1" />
+            <span>팀 크기: {project.team_size}명</span>
+          </div>
+          
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1"
+              onClick={(e) => {
+                e.stopPropagation()
+                onViewProject(project)
+              }}
+            >
+              상세보기
+            </Button>
+            <Button 
+              variant={openProject?.id === project.id ? "default" : "outline"}
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (openProject?.id === project.id) {
+                  // 이미 열린 프로젝트인 경우 닫기
+                  localStorage.removeItem('openProject')
+                  window.dispatchEvent(new StorageEvent('storage', {
+                    key: 'openProject',
+                    newValue: null,
+                    oldValue: JSON.stringify(project)
+                  }))
+                } else {
+                  // 프로젝트 열기 기능 - localStorage에 저장하고 이벤트 발생
+                  localStorage.setItem('openProject', JSON.stringify(project))
+                  // 같은 탭에서 localStorage 이벤트를 수동으로 발생시킴
+                  window.dispatchEvent(new StorageEvent('storage', {
+                    key: 'openProject',
+                    newValue: JSON.stringify(project),
+                    oldValue: localStorage.getItem('openProject')
+                  }))
+                }
+              }}
+              className={`min-w-[100px] ${
+                openProject?.id === project.id 
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md ring-2 ring-blue-300 ring-offset-2' 
+                  : ''
+              }`}
+            >
+              {openProject?.id === project.id ? '열린 프로젝트' : '프로젝트 열기'}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 const Projects = () => {
   const { toast } = useToast()
   const { user, userProfile } = useAuth()
+  const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState("")
   const [filter, setFilter] = useState("전체")
-  const [projects, setProjects] = useState<Project[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [userAuthority, setUserAuthority] = useState<string | null>(null)
   const [userGroups, setUserGroups] = useState<{ [groupId: string]: any }>({})
 
@@ -49,47 +239,100 @@ const Projects = () => {
   const [viewingProject, setViewingProject] = useState<Project | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
+  const [openProject, setOpenProject] = useState<Project | null>(null)
 
-  // 프로젝트 목록 불러오기
-  const loadProjects = async () => {
-    try {
-      setIsLoading(true)
-      
-      // DB 연결 테스트
+  // React Query로 프로젝트 목록 관리
+  const { 
+    data: projects = [], 
+    isLoading, 
+    error: projectsError 
+  } = useQuery({
+    queryKey: ['projects'],
+    queryFn: async () => {
       console.log('🔍 DB 연결 테스트 시작...')
-      
       try {
         const dbProjects = await ProjectService.getProjects()
         console.log('✅ DB 연결 성공:', dbProjects)
-        
-        setProjects(dbProjects)
-        console.log('📊 프로젝트 데이터 설정 완료:', dbProjects)
+        return dbProjects
       } catch (dbError) {
         console.error('❌ DB 연결 실패:', dbError)
-        
-        toast({
-          title: "DB 연결 실패",
-          description: "프로젝트 목록을 불러오는데 실패했습니다. DB 설정을 확인해주세요.",
-          variant: "destructive"
-        })
+        throw new Error('프로젝트 목록을 불러오는데 실패했습니다.')
       }
-      
-    } catch (error) {
-      console.error('❌ 전체 로딩 실패:', error)
+    }
+  })
+
+  // 에러 처리
+  useEffect(() => {
+    if (projectsError) {
+      console.error('❌ 전체 로딩 실패:', projectsError)
       toast({
         title: "오류",
-        description: "프로젝트 목록을 불러오는데 실패했습니다.",
+        description: projectsError.message || "프로젝트 목록을 불러오는데 실패했습니다.",
         variant: "destructive"
       })
-    } finally {
-      setIsLoading(false)
     }
-  }
+  }, [projectsError, toast])
 
-  // 컴포넌트 마운트 시 프로젝트 목록 로드
+  // 열린 프로젝트 상태 관리
   useEffect(() => {
-    loadProjects()
+    // 초기 로드 시 localStorage에서 열린 프로젝트 확인
+    const savedOpenProject = localStorage.getItem('openProject')
+    if (savedOpenProject) {
+      try {
+        setOpenProject(JSON.parse(savedOpenProject))
+      } catch (e) {
+        console.error('Failed to parse saved open project:', e)
+      }
+    }
+
+    // localStorage 변경 이벤트 리스너
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'openProject') {
+        if (e.newValue) {
+          try {
+            setOpenProject(JSON.parse(e.newValue))
+          } catch (error) {
+            console.error('Failed to parse open project from storage event:', error)
+          }
+        } else {
+          setOpenProject(null)
+        }
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
   }, [])
+
+  // React Query로 즐겨찾기 관리
+  const { 
+    data: favoriteProjectIds = [], 
+    error: favoritesError 
+  } = useQuery({
+    queryKey: ['favorites', user?.id],
+    queryFn: () => FavoriteService.getUserFavorites(user!.id),
+    enabled: !!user
+  })
+
+  // 즐겨찾기 에러 처리
+  useEffect(() => {
+    if (favoritesError) {
+      console.error('즐겨찾기 로드 실패:', favoritesError)
+      toast({
+        title: "오류",
+        description: "즐겨찾기 목록을 불러오는데 실패했습니다.",
+        variant: "destructive"
+      })
+    }
+  }, [favoritesError, toast])
+
+  // 즐겨찾기 상태를 useMemo로 최적화하여 무한 루프 방지
+  const favoriteProjectsSet = useMemo(() => {
+    return new Set(favoriteProjectIds || [])
+  }, [favoriteProjectIds])
+
+  // 즐겨찾기 상태를 직접 사용 (useState 제거)
+  const favoriteProjects = favoriteProjectsSet
 
   // 사용자 권한과 소속 기업 정보 로드
   useEffect(() => {
@@ -99,68 +342,46 @@ const Projects = () => {
   }, [user])
 
   const loadUserPermissions = async () => {
-    if (!user) return
-
     try {
-      // 1. 사용자 권한 조회
-      const { data: profile, error: profileError } = await supabase
+      // 사용자 권한 조회
+      const { data: profile } = await supabase
         .from('profiles')
         .select('authority')
         .eq('user_id', user.id)
         .single()
 
-      if (!profileError && profile) {
+      if (profile) {
         setUserAuthority(profile.authority)
       }
 
-      // 2. 사용자가 소속된 기업 정보 조회
-      const { data: groupMembers, error: groupError } = await supabase
+      // 사용자가 소속된 기업 정보 조회
+      const { data: memberships } = await supabase
         .from('group_members')
         .select(`
           group_id,
           role,
-          status
+          groups (
+            id,
+            name
+          )
         `)
         .eq('user_id', user.id)
         .eq('status', 'active')
 
-      if (!groupError && groupMembers) {
+      if (memberships) {
         const groupsMap: { [groupId: string]: any } = {}
-        groupMembers.forEach(member => {
-          groupsMap[member.group_id] = member
+        memberships.forEach(membership => {
+          if (membership.groups) {
+            groupsMap[membership.group_id] = {
+              ...membership.groups,
+              role: membership.role
+            }
+          }
         })
         setUserGroups(groupsMap)
       }
     } catch (error) {
-      console.error('사용자 권한 로드 중 오류:', error)
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "진행중":
-        return <Badge variant="default">진행중</Badge>
-      case "완료":
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-200">완료</Badge>
-      case "대기중":
-        return <Badge variant="secondary">대기중</Badge>
-      case "계획중":
-        return <Badge variant="outline">계획중</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
-    }
-  }
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "높음":
-        return "text-red-600"
-      case "중간":
-        return "text-yellow-600"
-      case "낮음":
-        return "text-green-600"
-      default:
-        return "text-muted-foreground"
+      console.error('사용자 권한 로드 실패:', error)
     }
   }
 
@@ -173,6 +394,10 @@ const Projects = () => {
     const matchesFilter = filter === "전체" || project.status === filter
     return matchesSearch && matchesFilter
   })
+
+  // 즐겨찾기 프로젝트와 일반 프로젝트 분리
+  const favoriteProjectsList = filteredProjects.filter(project => favoriteProjects.has(project.id))
+  const regularProjectsList = filteredProjects.filter(project => !favoriteProjects.has(project.id))
 
   const handleEditProject = (project: Project) => {
     setViewingProject(project)
@@ -194,13 +419,38 @@ const Projects = () => {
     setIsDetailModalOpen(true)
   }
 
+  // React Query mutation으로 즐겨찾기 토글
+  const toggleFavoriteMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      if (!user) throw new Error('로그인이 필요합니다.')
+      return await FavoriteService.toggleFavorite(user.id, projectId)
+    },
+    onSuccess: (isNowFavorite, projectId) => {
+      // 캐시 무효화하여 즐겨찾기 목록 다시 로드
+      queryClient.invalidateQueries({ queryKey: ['favorites', user?.id] })
+      
+      toast({
+        title: "성공",
+        description: isNowFavorite ? "즐겨찾기에 추가되었습니다." : "즐겨찾기에서 제거되었습니다.",
+      })
+    },
+    onError: (error) => {
+      console.error('즐겨찾기 토글 실패:', error)
+      toast({
+        title: "오류",
+        description: error.message || "즐겨찾기 상태를 변경하는데 실패했습니다.",
+        variant: "destructive"
+      })
+    }
+  })
+
+  const toggleFavorite = (projectId: string) => {
+    toggleFavoriteMutation.mutate(projectId)
+  }
+
   const handleCloseDetailModal = () => {
     setIsDetailModalOpen(false)
     setViewingProject(null)
-  }
-
-  const handleCreateProject = () => {
-    setIsCreateModalOpen(true)
   }
 
   const handleCloseCreateModal = () => {
@@ -211,7 +461,7 @@ const Projects = () => {
     setProjects(prev => [newProject, ...prev])
     toast({
       title: "성공",
-      description: "새 프로젝트가 생성되었습니다.",
+      description: "프로젝트가 성공적으로 생성되었습니다.",
     })
   }
 
@@ -251,15 +501,24 @@ const Projects = () => {
     
     // 3. 프로젝트가 할당된 기업의 관리자인 경우 삭제 가능
     if (project.group_id && userGroups[project.group_id]) {
-      const groupMember = userGroups[project.group_id]
-      if (groupMember.role === 'admin') return true
+      const groupInfo = userGroups[project.group_id]
+      return groupInfo.role === 'admin'
     }
     
     return false
   }
 
   const handleDeleteProject = async (project: Project) => {
-    if (window.confirm(`"${project.name}" 프로젝트를 정말 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) {
+    if (!canDeleteProject(project)) {
+      toast({
+        title: "권한 없음",
+        description: "이 프로젝트를 삭제할 권한이 없습니다.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (confirm(`"${project.name}" 프로젝트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
       try {
         await ProjectService.deleteProject(project.id)
         setProjects(prev => prev.filter(p => p.id !== project.id))
@@ -268,10 +527,11 @@ const Projects = () => {
           description: "프로젝트가 성공적으로 삭제되었습니다.",
         })
       } catch (error) {
+        console.error('프로젝트 삭제 실패:', error)
         toast({
           title: "오류",
           description: "프로젝트 삭제에 실패했습니다.",
-          variant: "destructive",
+          variant: "destructive"
         })
       }
     }
@@ -279,11 +539,9 @@ const Projects = () => {
 
   if (isLoading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <div className="flex items-center space-x-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span className="text-lg">프로젝트 목록을 불러오는 중...</span>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">프로젝트를 불러오는 중...</span>
       </div>
     )
   }
@@ -292,37 +550,11 @@ const Projects = () => {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold">프로젝트</h1>
-          <p className="text-muted-foreground">모든 프로젝트를 관리하고 추적하세요</p>
+        <div>
+          <h1 className="text-3xl font-bold">프로젝트 관리</h1>
+          <p className="text-muted-foreground">프로젝트를 생성하고 관리하세요</p>
         </div>
-        
-        {/* Selected Projects Info in Header */}
-        {selectedProjects.size > 0 && (
-          <div className="flex items-center space-x-4 mx-6">
-            <div className="flex items-center space-x-3 bg-primary/5 border border-primary/20 rounded-lg px-4 py-2">
-              <CheckCircle className="w-5 h-5 text-primary" />
-              <div>
-                <p className="text-sm font-medium text-primary">
-                  {selectedProjects.size}개 프로젝트 선택됨
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {projects.filter(p => selectedProjects.has(p.id)).map(p => p.name).join(', ')}
-                </p>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={clearAllSelections}
-                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-              >
-                ×
-              </Button>
-            </div>
-          </div>
-        )}
-        
-        <Button onClick={handleCreateProject}>
+        <Button onClick={() => setIsCreateModalOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           새 프로젝트
         </Button>
@@ -331,7 +563,7 @@ const Projects = () => {
       {/* Search and Filter */}
       <div className="flex items-center space-x-4">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="프로젝트 검색..."
             value={searchTerm}
@@ -356,126 +588,66 @@ const Projects = () => {
         </DropdownMenu>
       </div>
 
-      {/* Projects Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProjects.map((project) => (
-          <Card 
-            key={project.id} 
-            className={`hover:shadow-md transition-all duration-200 ${
-              selectedProjects.has(project.id)
-                ? 'ring-2 ring-primary bg-primary/5 shadow-lg' 
-                : 'hover:shadow-lg'
-            }`}
-          >
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="space-y-1 flex-1">
-                  <CardTitle className="text-lg">{project.name}</CardTitle>
-                  <CardDescription className="text-sm">
-                    {project.description}
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  {/* 프로젝트 체크박스 */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`h-8 w-8 ${
-                      selectedProjects.has(project.id)
-                        ? 'text-primary hover:text-primary' 
-                        : 'text-muted-foreground hover:text-primary'
-                    }`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleProjectToggle(project)
-                    }}
-                    title={selectedProjects.has(project.id) ? "선택 해제" : "프로젝트 선택"}
-                  >
-                    {selectedProjects.has(project.id) ? (
-                      <CheckCircle className="h-5 w-5" />
-                    ) : (
-                      <Circle className="h-5 w-5" />
-                    )}
-                  </Button>
-                  {canDeleteProject(project) && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeleteProject(project)
-                      }}
-                      title="프로젝트 삭제"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                {getStatusBadge(project.status)}
-                <span className={`text-sm font-medium ${getPriorityColor(project.priority)}`}>
-                  {project.priority} 우선순위
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">진행률</span>
-                  <span className="font-medium">{project.progress}%</span>
-                </div>
-                <Progress value={project.progress} className="h-2" />
-              </div>
-              
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <div className="flex items-center">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  종료일: {project.due_date ? new Date(project.due_date).toLocaleDateString('ko-KR') : '미정'}
-                </div>
-                <div className="flex items-center">
-                  <Users className="w-4 h-4 mr-1" />
-                  {project.team_size}명
-                </div>
-              </div>
-              
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex-1"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleViewProject(project)
-                  }}
-                >
-                  상세보기
-                </Button>
-                <Button 
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    // 프로젝트 열기 기능 - localStorage에 저장하고 이벤트 발생
-                    localStorage.setItem('openProject', JSON.stringify(project))
-                    // 같은 탭에서 localStorage 이벤트를 수동으로 발생시킴
-                    window.dispatchEvent(new StorageEvent('storage', {
-                      key: 'openProject',
-                      newValue: JSON.stringify(project),
-                      oldValue: localStorage.getItem('openProject')
-                    }))
-                  }}
-                  className="min-w-[80px]"
-                >
-                  프로젝트 열기
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      {/* 즐겨찾기 프로젝트 섹션 */}
+      {favoriteProjectsList.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Star className="h-5 w-5 text-yellow-500 fill-current" />
+            <h2 className="text-xl font-semibold">즐겨찾기 프로젝트</h2>
+            <Badge variant="secondary" className="ml-2">
+              {favoriteProjectsList.length}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {favoriteProjectsList.map((project) => (
+              <ProjectCard 
+                key={project.id} 
+                project={project} 
+                selectedProjects={selectedProjects}
+                favoriteProjects={favoriteProjects}
+                openProject={openProject}
+                onProjectToggle={handleProjectToggle}
+                onToggleFavorite={toggleFavorite}
+                onEditProject={handleEditProject}
+                onViewProject={handleViewProject}
+                onDeleteProject={handleDeleteProject}
+                canDeleteProject={canDeleteProject}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 일반 프로젝트 섹션 */}
+      <div className={favoriteProjectsList.length > 0 ? "mb-8" : ""}>
+        {favoriteProjectsList.length > 0 && (
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-xl font-semibold">전체 프로젝트</h2>
+            <Badge variant="outline" className="ml-2">
+              {regularProjectsList.length}
+            </Badge>
+          </div>
+        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {regularProjectsList.map((project) => (
+            <ProjectCard 
+              key={project.id} 
+              project={project} 
+              selectedProjects={selectedProjects}
+              favoriteProjects={favoriteProjects}
+              openProject={openProject}
+              onProjectToggle={handleProjectToggle}
+              onToggleFavorite={toggleFavorite}
+              onEditProject={handleEditProject}
+              onViewProject={handleViewProject}
+              onDeleteProject={handleDeleteProject}
+              canDeleteProject={canDeleteProject}
+            />
+          ))}
+        </div>
       </div>
 
+      {/* 빈 상태 메시지 */}
       {filteredProjects.length === 0 && (
         <div className="text-center py-12">
           <p className="text-muted-foreground">

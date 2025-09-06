@@ -22,8 +22,8 @@ export default function Organization() {
       <div className="flex items-center gap-3 mb-6">
         <Building2 className="w-8 h-8 text-primary" />
         <div>
-          <h1 className="text-3xl font-bold">조직 정보</h1>
-          <p className="text-muted-foreground">소속된 조직의 상세 정보를 확인할 수 있습니다.</p>
+          <h1 className="text-3xl font-bold">조직 관리</h1>
+          <p className="text-muted-foreground">조직 정보를 확인하고 관리할 수 있습니다.</p>
         </div>
       </div>
 

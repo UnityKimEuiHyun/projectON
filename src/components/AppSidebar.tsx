@@ -18,7 +18,10 @@ import {
   MessageSquare,
   Briefcase,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  CalendarDays,
+  GanttChart,
+  MapPin
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
@@ -50,26 +53,26 @@ const mainItems = [
 
 // 조직 관리 메뉴
 const organizationItems = [
-  { title: "조직 정보", url: "/organization", icon: Building2 },
+  { title: "조직 관리", url: "/organization", icon: Building2 },
   { title: "구성원 관리", url: "/team", icon: Users },
 ]
 
 // 프로젝트 관리 메뉴
 const projectManagementItems = [
-  { title: "프로젝트 목록", url: "/projects", icon: FolderOpen },
-  { title: "프로젝트 타임라인", url: "/timeline", icon: BarChart3 },
+  { title: "전체 프로젝트 목록", url: "/projects", icon: FolderOpen },
+  { title: "전체 프로젝트 계획", url: "/timeline", icon: GanttChart },
 ]
 
 // 열린 프로젝트 관리 메뉴 (동적으로 생성됨)
 const getOpenProjectItems = (projectName: string) => [
+  { title: "프로젝트 요약", url: "/projects/summary", icon: BarChart3 },
   { title: "WBS 관리", url: "/projects/wbs", icon: BarChart3 },
   { title: "비용 관리", url: "/projects/cost", icon: DollarSign },
-  { title: "비용 및 조달", url: "/projects/expense", icon: ShoppingCart },
+  { title: "재산 관리", url: "/projects/expense", icon: ShoppingCart },
   { title: "일일 보고서", url: "/projects/daily-report", icon: FileText },
   { title: "주간 보고서", url: "/projects/weekly-report", icon: ClipboardList },
   { title: "프로젝트 로그", url: "/projects/log", icon: BookOpen },
   { title: "회의록", url: "/projects/meetings", icon: MessageSquare },
-  { title: "자원 및 노력 관리", url: "/projects/resources", icon: Briefcase },
 ]
 
 const settingsItems = [
@@ -78,7 +81,7 @@ const settingsItems = [
 
 export function AppSidebar() {
   const { user, signOut } = useAuth();
-  const { state } = useSidebar()
+  const { state, setOpenMobile } = useSidebar()
   const location = useLocation()
   const currentPath = location.pathname
   const collapsed = state === "collapsed"
@@ -173,6 +176,12 @@ export function AppSidebar() {
   const closeProjectHandler = () => {
     setOpenProject(null)
     localStorage.removeItem('openProject')
+    // 다른 탭에서도 상태가 업데이트되도록 이벤트 발생
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'openProject',
+      newValue: null,
+      oldValue: localStorage.getItem('openProject')
+    }))
   }
 
   const renderMenuItem = (item: any, level: number = 0) => {
@@ -180,12 +189,21 @@ export function AppSidebar() {
     const isExpanded = expandedMenus.has(item.title)
     const isActiveItem = isActive(item.url)
 
+    const handleMenuClick = () => {
+      if (hasSubItems) {
+        toggleMenu(item.title)
+      } else {
+        // 모바일에서 사이드바 닫기
+        setOpenMobile(false)
+      }
+    }
+
     return (
       <div key={item.title}>
         <SidebarMenuItem>
           <SidebarMenuButton 
             asChild={!hasSubItems}
-            onClick={hasSubItems ? () => toggleMenu(item.title) : undefined}
+            onClick={handleMenuClick}
             className={hasSubItems ? "cursor-pointer" : ""}
           >
             {hasSubItems ? (
@@ -213,7 +231,11 @@ export function AppSidebar() {
             {item.subItems.map((subItem: any) => (
               <SidebarMenuItem key={subItem.title}>
                 <SidebarMenuButton asChild>
-                  <NavLink to={subItem.url} className={getNavCls(subItem.url)}>
+                  <NavLink 
+                    to={subItem.url} 
+                    className={getNavCls(subItem.url)}
+                    onClick={() => setOpenMobile(false)}
+                  >
                     <subItem.icon className="w-4 h-4" />
                     <span className="text-sm">{subItem.title}</span>
                   </NavLink>
@@ -278,7 +300,7 @@ export function AppSidebar() {
 
           {/* Main Navigation */}
           <SidebarGroup>
-            <SidebarGroupLabel>메인</SidebarGroupLabel>
+            <SidebarGroupLabel>개인 관리</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {mainItems.map((item) => renderMenuItem(item))}
@@ -298,7 +320,7 @@ export function AppSidebar() {
 
           {/* Project Management */}
           <SidebarGroup>
-            <SidebarGroupLabel>프로젝트 관리</SidebarGroupLabel>
+            <SidebarGroupLabel>전체 프로젝트 관리</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {projectManagementItems.map((item) => renderMenuItem(item))}
@@ -372,7 +394,7 @@ export function AppSidebar() {
               asChild
               className="w-full justify-start"
             >
-              <NavLink to="/profile-edit">
+              <NavLink to="/profile-edit" onClick={() => setOpenMobile(false)}>
                 <User className="mr-2 h-4 w-4" />
                 개인정보 수정
               </NavLink>
@@ -380,7 +402,10 @@ export function AppSidebar() {
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={signOut}
+              onClick={() => {
+                setOpenMobile(false)
+                signOut()
+              }}
               className="w-full justify-start"
             >
               <LogOut className="mr-2 h-4 w-4" />

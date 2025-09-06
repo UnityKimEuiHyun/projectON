@@ -16,193 +16,152 @@ export default function Timeline() {
     { id: "3", name: "모바일 앱 개발", status: "계획중" },
   ]
 
-  // 이미지의 실제 작업 데이터를 반영
-  const tasks = [
-    // Parameter 설계
+  // 여러 프로젝트의 Lv1 작업들만 표시
+  const projectTasks = [
+    // 물류 창고 시뮬레이션 프로젝트
     {
       id: "1",
-      category: "Parameter 설계",
-      name: "물류 창고 시뮬레이션 객체 분석",
+      project: "물류 창고 시뮬레이션 프로젝트",
+      name: "1. 프로젝트 기획",
       startDate: "2025-09-01",
-      endDate: "2025-09-12",
+      endDate: "2025-09-31",
       progress: 100,
-      assignee: "김분석",
+      assignee: "프로젝트 매니저",
       status: "완료",
       color: "bg-blue-200"
     },
     {
       id: "2",
-      category: "Parameter 설계",
-      name: "객체별 시뮬레이션 Parameter 기본 설계",
-      startDate: "2025-09-15",
-      endDate: "2025-09-26",
-      progress: 100,
-      assignee: "박설계",
-      status: "완료",
+      project: "물류 창고 시뮬레이션 프로젝트",
+      name: "2. Parameter 설계",
+      startDate: "2025-09-01",
+      endDate: "2025-10-31",
+      progress: 85,
+      assignee: "설계팀",
+      status: "진행중",
       color: "bg-green-200"
     },
     {
       id: "3",
-      category: "Parameter 설계",
-      name: "환경 Parameter 기본 설계",
-      startDate: "2025-10-13",
-      endDate: "2025-10-24",
-      progress: 80,
-      assignee: "이환경",
+      project: "물류 창고 시뮬레이션 프로젝트",
+      name: "3. 지표 계산 로직 개발",
+      startDate: "2025-11-01",
+      endDate: "2025-12-31",
+      progress: 60,
+      assignee: "개발팀",
       status: "진행중",
-      color: "bg-green-200"
+      color: "bg-orange-200"
     },
-
-    // 물동량, 면적 등 지표 계산 로직
     {
       id: "4",
-      category: "물동량, 면적 등 지표 계산 로직",
-      name: "기존 지표 계산 로직 분석/정의",
-      startDate: "2025-09-01",
-      endDate: "2025-09-19",
-      progress: 100,
-      assignee: "최로직",
-      status: "완료",
-      color: "bg-blue-200"
+      project: "물류 창고 시뮬레이션 프로젝트",
+      name: "4. 어댑터 개발",
+      startDate: "2025-10-01",
+      endDate: "2026-01-31",
+      progress: 45,
+      assignee: "개발팀",
+      status: "진행중",
+      color: "bg-pink-200"
     },
+
+    // 웹사이트 리뉴얼 프로젝트
     {
       id: "5",
-      category: "물동량, 면적 등 지표 계산 로직",
-      name: "지표 계산 입/출력 데이터 정의",
-      startDate: "2025-09-22",
-      endDate: "2025-10-24",
-      progress: 90,
-      assignee: "정데이터",
-      status: "진행중",
+      project: "웹사이트 리뉴얼 프로젝트",
+      name: "1. 프로젝트 기획",
+      startDate: "2024-01-01",
+      endDate: "2024-01-31",
+      progress: 100,
+      assignee: "프로젝트 매니저",
+      status: "완료",
       color: "bg-blue-200"
     },
     {
       id: "6",
-      category: "물동량, 면적 등 지표 계산 로직",
-      name: "지표 계산 모듈 구조 설계",
-      startDate: "2025-10-20",
-      endDate: "2025-10-31",
-      progress: 70,
-      assignee: "한구조",
-      status: "진행중",
-      color: "bg-blue-200"
+      project: "웹사이트 리뉴얼 프로젝트",
+      name: "2. 디자인",
+      startDate: "2024-02-01",
+      endDate: "2024-02-28",
+      progress: 100,
+      assignee: "디자인팀",
+      status: "완료",
+      color: "bg-green-200"
     },
-
-    // 시뮬레이션 어댑터 설계
     {
       id: "7",
-      category: "시뮬레이션 어댑터 설계",
-      name: "Web용 3D Asset 데이터 구성요소 분석 및 조정",
-      startDate: "2025-09-01",
-      endDate: "2025-09-26",
-      progress: 100,
-      assignee: "김3D",
-      status: "완료",
+      project: "웹사이트 리뉴얼 프로젝트",
+      name: "3. 개발",
+      startDate: "2024-03-01",
+      endDate: "2024-05-31",
+      progress: 80,
+      assignee: "개발팀",
+      status: "진행중",
       color: "bg-orange-200"
     },
+
+    // 모바일 앱 개발
     {
       id: "8",
-      category: "시뮬레이션 어댑터 설계",
-      name: "Web용 Map 데이터 구조 분석 및 조정",
-      startDate: "2025-09-01",
-      endDate: "2025-09-12",
-      progress: 100,
-      assignee: "박맵",
-      status: "완료",
-      color: "bg-orange-200"
+      project: "모바일 앱 개발",
+      name: "1. 프로젝트 기획",
+      startDate: "2024-06-01",
+      endDate: "2024-06-30",
+      progress: 0,
+      assignee: "프로젝트 매니저",
+      status: "계획중",
+      color: "bg-blue-200"
     },
     {
       id: "9",
-      category: "시뮬레이션 어댑터 설계",
-      name: "시뮬레이션용 3D Asset 데이터 설계",
-      startDate: "2025-09-29",
-      endDate: "2025-10-17",
-      progress: 85,
-      assignee: "이시뮬",
-      status: "진행중",
-      color: "bg-orange-200"
+      project: "모바일 앱 개발",
+      name: "2. UI/UX 디자인",
+      startDate: "2024-07-01",
+      endDate: "2024-08-31",
+      progress: 0,
+      assignee: "디자인팀",
+      status: "계획중",
+      color: "bg-green-200"
     },
     {
       id: "10",
-      category: "시뮬레이션 어댑터 설계",
-      name: "시뮬레이션 맵 데이터 설계",
-      startDate: "2025-09-15",
-      endDate: "2025-09-26",
-      progress: 100,
-      assignee: "최맵",
-      status: "완료",
+      project: "모바일 앱 개발",
+      name: "3. 앱 개발",
+      startDate: "2024-09-01",
+      endDate: "2024-12-31",
+      progress: 0,
+      assignee: "개발팀",
+      status: "계획중",
       color: "bg-orange-200"
-    },
-    {
-      id: "11",
-      category: "시뮬레이션 어댑터 설계",
-      name: "시뮬레이션 맵 데이터 Converting 설계",
-      startDate: "2025-09-29",
-      endDate: "2025-10-24",
-      progress: 75,
-      assignee: "정컨버팅",
-      status: "진행중",
-      color: "bg-orange-200"
-    },
-
-    // 물동량, 면적 등 지표 계산 모듈 개발
-    {
-      id: "12",
-      category: "물동량, 면적 등 지표 계산 모듈 개발",
-      name: "지표 계산 모듈 구조 구현",
-      startDate: "2025-11-03",
-      endDate: "2025-11-21",
-      progress: 60,
-      assignee: "김구현",
-      status: "진행중",
-      color: "bg-blue-200"
-    },
-    {
-      id: "13",
-      category: "물동량, 면적 등 지표 계산 모듈 개발",
-      name: "지표별 산출 함수 구현",
-      startDate: "2025-11-24",
-      endDate: "2025-12-31",
-      progress: 40,
-      assignee: "박함수",
-      status: "진행중",
-      color: "bg-blue-200"
-    },
-
-    // 시뮬레이션 어댑터 개발
-    {
-      id: "14",
-      category: "시뮬레이션 어댑터 개발",
-      name: "시뮬레이션 어댑터 개발",
-      startDate: "2025-10-20",
-      endDate: "2025-12-31",
-      progress: 55,
-      assignee: "이어댑터",
-      status: "진행중",
-      color: "bg-pink-200"
-    },
-    {
-      id: "15",
-      category: "시뮬레이션 어댑터 개발",
-      name: "맵 로딩 테스트",
-      startDate: "2026-01-05",
-      endDate: "2026-01-09",
-      progress: 20,
-      assignee: "최테스트",
-      status: "진행중",
-      color: "bg-pink-200"
     }
   ]
 
-  // 연도별 월 표시 (2025년 9월부터 2026년 3월까지)
+  // 연도별 월 표시 (2024년 1월부터 2026년 1월까지)
   const months = [
+    { year: 2024, month: 1, label: "2024년 1월" },
+    { year: 2024, month: 2, label: "2024년 2월" },
+    { year: 2024, month: 3, label: "2024년 3월" },
+    { year: 2024, month: 4, label: "2024년 4월" },
+    { year: 2024, month: 5, label: "2024년 5월" },
+    { year: 2024, month: 6, label: "2024년 6월" },
+    { year: 2024, month: 7, label: "2024년 7월" },
+    { year: 2024, month: 8, label: "2024년 8월" },
+    { year: 2024, month: 9, label: "2024년 9월" },
+    { year: 2024, month: 10, label: "2024년 10월" },
+    { year: 2024, month: 11, label: "2024년 11월" },
+    { year: 2024, month: 12, label: "2024년 12월" },
+    { year: 2025, month: 1, label: "2025년 1월" },
+    { year: 2025, month: 2, label: "2025년 2월" },
+    { year: 2025, month: 3, label: "2025년 3월" },
+    { year: 2025, month: 4, label: "2025년 4월" },
+    { year: 2025, month: 5, label: "2025년 5월" },
+    { year: 2025, month: 6, label: "2025년 6월" },
+    { year: 2025, month: 7, label: "2025년 7월" },
+    { year: 2025, month: 8, label: "2025년 8월" },
     { year: 2025, month: 9, label: "2025년 9월" },
     { year: 2025, month: 10, label: "2025년 10월" },
     { year: 2025, month: 11, label: "2025년 11월" },
     { year: 2025, month: 12, label: "2025년 12월" },
-    { year: 2026, month: 1, label: "2026년 1월" },
-    { year: 2026, month: 2, label: "2026년 2월" },
-    { year: 2026, month: 3, label: "2026년 3월" }
+    { year: 2026, month: 1, label: "2026년 1월" }
   ]
 
   const getStatusColor = (status: string) => {
@@ -226,8 +185,8 @@ export default function Timeline() {
     const start = new Date(startDate)
     const end = new Date(endDate)
     
-    // 2025년 9월을 기준점(0)으로 설정
-    const baseDate = new Date('2025-09-01')
+    // 2024년 1월을 기준점(0)으로 설정
+    const baseDate = new Date('2024-01-01')
     const startDiff = start.getTime() - baseDate.getTime()
     const endDiff = end.getTime() - baseDate.getTime()
     
@@ -250,14 +209,14 @@ export default function Timeline() {
     return taskStart <= monthEnd && taskEnd >= monthStart
   }
 
-  // 카테고리별로 작업 그룹화
-  const groupedTasks = tasks.reduce((acc, task) => {
-    if (!acc[task.category]) {
-      acc[task.category] = []
+  // 프로젝트별로 작업 그룹화
+  const groupedTasks = projectTasks.reduce((acc, task) => {
+    if (!acc[task.project]) {
+      acc[task.project] = []
     }
-    acc[task.category].push(task)
+    acc[task.project].push(task)
     return acc
-  }, {} as Record<string, typeof tasks>)
+  }, {} as Record<string, typeof projectTasks>)
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -326,8 +285,8 @@ export default function Timeline() {
       {/* 간트 차트 */}
       <Card>
         <CardHeader>
-          <CardTitle>프로젝트 일정</CardTitle>
-          <CardDescription>2025년 9월부터 2026년 3월까지의 연속적인 프로젝트 일정입니다.</CardDescription>
+          <CardTitle>전체 프로젝트 계획</CardTitle>
+          <CardDescription>여러 프로젝트의 Lv1 작업들을 통합하여 확인할 수 있습니다.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -342,7 +301,7 @@ export default function Timeline() {
               {/* 헤더 - 연도별 월 구분 */}
               <div className="flex border-b border-gray-200">
                 <div className="w-64 p-3 font-medium bg-gray-50 border-r border-gray-200 flex-shrink-0">
-                  작업 카테고리
+                  프로젝트명
                 </div>
                 {months.map((month, index) => (
                   <div 
@@ -439,19 +398,19 @@ export default function Timeline() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-blue-200 rounded"></div>
-              <span className="text-sm">Parameter 설계</span>
+              <span className="text-sm">프로젝트 기획</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-green-200 rounded"></div>
-              <span className="text-sm">지표 계산 로직</span>
+              <span className="text-sm">디자인/설계</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-orange-200 rounded"></div>
-              <span className="text-sm">어댑터 설계</span>
+              <span className="text-sm">개발</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-pink-200 rounded"></div>
-              <span className="text-sm">어댑터 개발</span>
+              <span className="text-sm">기타</span>
             </div>
           </div>
         </CardContent>
