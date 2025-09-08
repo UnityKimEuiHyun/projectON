@@ -1,0 +1,9 @@
+✅ Vercel 배포용 Git Push 기본 명령어
+git add .
+git commit -m "💡 변경 내용 메시지 작성"
+git push origin main
+
+이 명령이 실행되면 Vercel이 자동으로:
+GitHub 리포지토리의 변경사항을 감지하고
+최신 커밋 기준으로 npm run build 또는 next build 등 빌드 스크립트를 실행한 후
+새로 빌드된 사이트를 자동으로 배포합니다.

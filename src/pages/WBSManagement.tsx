@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BarChart3, Plus, Edit, Trash2, ChevronDown, ChevronRight, Calendar, User, Table, GanttChart, Filter, Download, Search, Minus, Plus as PlusIcon } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { BarChart3, Plus, Edit, Trash2, ChevronDown, ChevronRight, Calendar, User, Table, GanttChart, Filter, Download, Search, Minus, Plus as PlusIcon, UserPlus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 // 드롭다운 스타일을 위한 CSS
@@ -175,7 +176,7 @@ export default function WBSManagement() {
       level: 1,
       startDate: "2024-01-01",
       endDate: "2024-01-31",
-      assignee: "프로젝트 매니저",
+      assignee: "김의현",
       status: "완료",
       progress: 100,
       children: [
@@ -185,7 +186,7 @@ export default function WBSManagement() {
           level: 2,
           startDate: "2024-01-01",
           endDate: "2024-01-15",
-          assignee: "김분석",
+          assignee: "김의현2",
           status: "완료",
           progress: 100,
           children: [
@@ -411,6 +412,28 @@ export default function WBSManagement() {
   const [zoomLevel, setZoomLevel] = useState<number>(1)
   const [levelFilters, setLevelFilters] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]))
   const [tasks, setTasks] = useState<WBSTask[]>(wbsTasks)
+  
+  // 담당자 모달 상태
+  const [assigneeModalOpen, setAssigneeModalOpen] = useState(false)
+  const [selectedTaskId, setSelectedTaskId] = useState<string>("")
+  const [assigneeSearchTerm, setAssigneeSearchTerm] = useState("")
+  
+  // Task 상세 모달 상태
+  const [taskDetailModalOpen, setTaskDetailModalOpen] = useState(false)
+  const [selectedTaskDetail, setSelectedTaskDetail] = useState<WBSTask | null>(null)
+  
+  // 구성원 데이터 (실제로는 API에서 가져올 예정)
+  const teamMembers = [
+    { id: "1", name: "김의현", email: "ehkim1130@gmail.com", role: "프로젝트 매니저" },
+    { id: "2", name: "김의현2", email: "ehkim2@company.com", role: "분석가" },
+    { id: "3", name: "김분석", email: "kim.analysis@company.com", role: "분석가" },
+    { id: "4", name: "박계획", email: "park.planning@company.com", role: "기획자" },
+    { id: "5", name: "이디자인", email: "lee.design@company.com", role: "디자이너" },
+    { id: "6", name: "최그래픽", email: "choi.graphic@company.com", role: "그래픽 디자이너" },
+    { id: "7", name: "최프로토", email: "choi.prototype@company.com", role: "프로토타이퍼" },
+    { id: "8", name: "김프론트", email: "kim.frontend@company.com", role: "프론트엔드 개발자" },
+    { id: "9", name: "박백엔드", email: "park.backend@company.com", role: "백엔드 개발자" }
+  ]
 
   // 진행률 업데이트 함수
   const updateTaskProgress = (taskId: string, newProgress: number) => {
@@ -442,6 +465,52 @@ export default function WBSManagement() {
       })
     }
     setTasks(updateTaskInArray(tasks))
+  }
+
+  // 담당자 업데이트 함수
+  const updateTaskAssignee = (taskId: string, newAssignee: string) => {
+    const updateTaskInArray = (taskList: WBSTask[]): WBSTask[] => {
+      return taskList.map(task => {
+        if (task.id === taskId) {
+          return { ...task, assignee: newAssignee }
+        }
+        if (task.children) {
+          return { ...task, children: updateTaskInArray(task.children) }
+        }
+        return task
+      })
+    }
+    setTasks(updateTaskInArray(tasks))
+  }
+
+  // 담당자 모달 열기
+  const openAssigneeModal = (taskId: string) => {
+    setSelectedTaskId(taskId)
+    setAssigneeSearchTerm("")
+    setAssigneeModalOpen(true)
+  }
+
+  // 담당자 선택
+  const selectAssignee = (member: any) => {
+    updateTaskAssignee(selectedTaskId, member.name)
+    setAssigneeModalOpen(false)
+    toast({
+      title: "담당자 변경 완료",
+      description: `${member.name}님이 담당자로 설정되었습니다.`,
+    })
+  }
+
+  // 검색된 구성원 필터링
+  const filteredMembers = teamMembers.filter(member =>
+    member.name.toLowerCase().includes(assigneeSearchTerm.toLowerCase()) ||
+    member.email.toLowerCase().includes(assigneeSearchTerm.toLowerCase()) ||
+    member.role.toLowerCase().includes(assigneeSearchTerm.toLowerCase())
+  )
+
+  // Task 상세 모달 열기
+  const openTaskDetailModal = (task: WBSTask) => {
+    setSelectedTaskDetail(task)
+    setTaskDetailModalOpen(true)
   }
 
   // WBS 통계 계산 함수들
@@ -799,7 +868,41 @@ export default function WBSManagement() {
         
         {/* 작업명 */}
         <div className="w-[300px] flex items-center gap-2">
-          <span className="font-medium text-sm">{task.name}</span>
+          <button
+            onClick={() => openTaskDetailModal(task)}
+            className="font-medium text-sm text-left hover:underline cursor-pointer text-blue-600 hover:text-blue-800"
+          >
+            {task.name}
+          </button>
+        </div>
+        
+        {/* 진행률 게이지 + 입력 */}
+        <div className="flex-1 flex flex-col items-start gap-1 py-1">
+          {/* 넘버박스 */}
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={task.progress}
+              onChange={(e) => {
+                const newProgress = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
+                updateTaskProgress(task.id, newProgress)
+              }}
+              onFocus={(e) => {
+                e.target.select()
+              }}
+              className="w-12 px-1 py-1 text-xs border border-gray-300 rounded text-center"
+            />
+            <span className="text-xs text-muted-foreground">%</span>
+          </div>
+          {/* 게이지 바 */}
+          <div className="w-20 bg-gray-200 rounded-full h-2">
+            <div
+              className={`h-2 rounded-full ${getProgressColor(task.progress)}`}
+              style={{ width: `${task.progress}%` }}
+            />
+          </div>
         </div>
         
         {/* 상태 */}
@@ -1249,39 +1352,18 @@ export default function WBSManagement() {
             </div>
             
         {/* 담당자 */}
-        <div className="flex-1 flex items-center gap-2">
-              <User className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm">{task.assignee}</span>
-            </div>
-            
-        {/* 진행률 게이지 + 입력 */}
-        <div className="flex-1 flex items-center gap-2">
-              <div className="flex items-center gap-2">
-                <div className="w-16 bg-gray-200 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${getProgressColor(task.progress)}`}
-                    style={{ width: `${task.progress}%` }}
-                  />
-                </div>
-            <div className="flex items-center gap-0">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={task.progress}
-                onChange={(e) => {
-                  const newProgress = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
-                  updateTaskProgress(task.id, newProgress)
-                }}
-                onFocus={(e) => {
-                  e.target.select()
-                }}
-                className="w-12 px-1 py-1 text-xs border border-gray-300 rounded text-center"
-              />
-              <span className="text-xs text-muted-foreground">%</span>
-              </div>
-            </div>
-          </div>
+        <div className="flex-1 flex items-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openAssigneeModal(task.id)}
+            className="flex items-center gap-2 h-8 px-3 text-sm"
+          >
+            <User className="w-4 h-4" />
+            <span className="truncate max-w-[120px]">{task.assignee}</span>
+            <UserPlus className="w-3 h-3 opacity-50" />
+          </Button>
+        </div>
       </div>
     )
   }
@@ -1289,6 +1371,171 @@ export default function WBSManagement() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <style dangerouslySetInnerHTML={{ __html: dropdownStyles }} />
+      
+      {/* 담당자 선택 모달 */}
+      <Dialog open={assigneeModalOpen} onOpenChange={setAssigneeModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>담당자 선택</DialogTitle>
+            <DialogDescription>
+              작업의 담당자를 선택하세요.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* 검색 입력 */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="이름, 이메일, 역할로 검색..."
+                value={assigneeSearchTerm}
+                onChange={(e) => setAssigneeSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            {/* 구성원 목록 */}
+            <div className="max-h-60 overflow-y-auto space-y-2">
+              {filteredMembers.length > 0 ? (
+                filteredMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    onClick={() => selectAssignee(member)}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                      <User className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm">{member.name}</div>
+                      <div className="text-xs text-gray-500 truncate">{member.email}</div>
+                      <div className="text-xs text-gray-400">{member.role}</div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <User className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>검색 결과가 없습니다.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task 상세 모달 */}
+      <Dialog open={taskDetailModalOpen} onOpenChange={setTaskDetailModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>작업 상세 정보</DialogTitle>
+            <DialogDescription>
+              선택한 작업의 상세 정보를 확인할 수 있습니다.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedTaskDetail && (
+            <div className="space-y-6">
+              {/* 기본 정보 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">ID</label>
+                  <div className="text-sm font-mono bg-gray-100 px-3 py-2 rounded">
+                    {selectedTaskDetail.id}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">레벨</label>
+                  <div className="text-sm bg-gray-100 px-3 py-2 rounded">
+                    Level {selectedTaskDetail.level}
+                  </div>
+                </div>
+              </div>
+
+              {/* 작업명 */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-500">작업명</label>
+                <div className="text-lg font-medium bg-gray-100 px-3 py-2 rounded">
+                  {selectedTaskDetail.name}
+                </div>
+              </div>
+
+              {/* 진행률과 상태 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">진행률</label>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-32 bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full ${getProgressColor(selectedTaskDetail.progress)}`}
+                          style={{ width: `${selectedTaskDetail.progress}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-medium">{selectedTaskDetail.progress}%</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">상태</label>
+                  <div className="flex items-center gap-2">
+                    <Badge className={getStatusColor(selectedTaskDetail.status)}>
+                      {selectedTaskDetail.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* 날짜 정보 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">시작일</label>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm">{selectedTaskDetail.startDate}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">종료일</label>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm">{selectedTaskDetail.endDate}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 담당자 */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-500">담당자</label>
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm">{selectedTaskDetail.assignee}</span>
+                </div>
+              </div>
+
+              {/* 하위 작업이 있는 경우 */}
+              {selectedTaskDetail.children && selectedTaskDetail.children.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">하위 작업</label>
+                  <div className="space-y-1">
+                    {selectedTaskDetail.children.map((child) => (
+                      <div key={child.id} className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded">
+                        <span className="font-mono text-xs">{child.id}</span>
+                        <span>{child.name}</span>
+                        <Badge className={getStatusColor(child.status)} variant="outline">
+                          {child.status}
+                        </Badge>
+                        <span className="text-xs text-gray-500">{child.progress}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
         <BarChart3 className="w-8 h-8 text-primary" />
@@ -1387,11 +1634,11 @@ export default function WBSManagement() {
                 <div className="w-[16px]">L5</div>
                 <div className="w-[12px]"></div>
                 <div className="w-[300px]">작업명</div>
+                <div className="flex-1">진행률</div>
                 <div className="w-28">상태</div>
                 <div className="flex-1">시작일</div>
                 <div className="flex-1">종료일</div>
                 <div className="flex-1">담당자</div>
-                <div className="flex-1">진행률</div>
               </div>
 
               {/* 작업 목록 */}
@@ -1471,7 +1718,7 @@ export default function WBSManagement() {
                     <div className="w-64 p-3 font-medium bg-gray-50 border-r border-gray-200 flex-shrink-0">
                       작업명
                     </div>
-                    <div className="flex-1 bg-gray-50">
+                    <div className="flex-1 bg-gray-50 relative">
                       {/* 월별 헤더 */}
                       <div className="relative">
                         {months.map((month, index) => {
@@ -1492,7 +1739,7 @@ export default function WBSManagement() {
                           return (
                             <div
                               key={`${month.year}-${month.month}`}
-                              className="absolute top-0 p-2 text-center border-r border-gray-300"
+                              className="absolute top-0 p-2 text-center"
                               style={{ 
                                 left: `${monthPosition}%`,
                                 width: `${monthWidth}%`,
@@ -1504,21 +1751,22 @@ export default function WBSManagement() {
                           )
                         })}
                       </div>
+                      
                     </div>
                   </div>
 
                   {/* 작업 행들 */}
                   {convertToGanttTasks(tasks).map((task) => (
-                    <div key={task.id} className="flex border-b border-gray-200 hover:bg-gray-50">
+                    <div key={task.id} className="flex border-b border-gray-200 hover:bg-gray-50 min-h-[32px]">
                       {/* 작업 정보 */}
-                      <div className="w-64 p-3 border-r border-gray-200 flex-shrink-0">
+                      <div className="w-64 p-2 border-r border-gray-200 flex-shrink-0">
                         <div className="flex items-center">
                           {/* 들여쓰기 */}
                           <div style={{ paddingLeft: `${task.depth * 20}px` }} className="flex items-center relative z-10">
                             {/* 접기/펼치기 버튼 */}
                             {task.hasChildren ? (
                               <button
-                                className="w-6 h-6 mr-2 flex items-center justify-center hover:bg-gray-200 rounded border border-gray-300 bg-white cursor-pointer relative"
+                                className="w-5 h-5 mr-1 flex items-center justify-center hover:bg-gray-200 rounded border border-gray-300 bg-white cursor-pointer relative"
                                 style={{ zIndex: 9999 }}
                                 onClick={(e) => {
                                   e.preventDefault()
@@ -1527,24 +1775,43 @@ export default function WBSManagement() {
                                 }}
                               >
                                 {expandedTasks.has(task.id) ? (
-                                  <ChevronDown className="w-4 h-4" />
+                                  <ChevronDown className="w-3 h-3" />
                                 ) : (
-                                  <ChevronRight className="w-4 h-4" />
+                                  <ChevronRight className="w-3 h-3" />
                                 )}
                               </button>
                             ) : (
-                              <div className="w-6 h-6 mr-2" />
+                              <div className="w-5 h-5 mr-1" />
                             )}
                             
                             {/* 작업명 */}
                               <div className="flex-1">
-                                <div className={`font-medium text-sm ${
-                                  task.level === 3 ? 'text-blue-600' : 
-                                  task.level === 2 ? 'text-green-600' : 
-                                  'text-gray-700'
-                                }`}>
+                                <button
+                                  onClick={() => {
+                                    // 원본 task 데이터 찾기
+                                    const findOriginalTask = (taskList: WBSTask[], taskId: string): WBSTask | null => {
+                                      for (const t of taskList) {
+                                        if (t.id === taskId) return t
+                                        if (t.children) {
+                                          const found = findOriginalTask(t.children, taskId)
+                                          if (found) return found
+                                        }
+                                      }
+                                      return null
+                                    }
+                                    const originalTask = findOriginalTask(tasks, task.id)
+                                    if (originalTask) {
+                                      openTaskDetailModal(originalTask)
+                                    }
+                                  }}
+                                  className={`font-medium text-xs text-left hover:underline cursor-pointer leading-tight ${
+                                    task.level === 3 ? 'text-blue-600 hover:text-blue-800' : 
+                                    task.level === 2 ? 'text-green-600 hover:text-green-800' : 
+                                    'text-gray-700 hover:text-gray-900'
+                                  }`}
+                                >
                                   {task.name}
-                                </div>
+                                </button>
                               </div>
                           </div>
                         </div>
@@ -1552,28 +1819,11 @@ export default function WBSManagement() {
 
                       {/* 타임라인 바 - 최하위 항목만 (하위 작업이 없는 항목) */}
                       {!task.hasChildren ? (
-                        <div className="flex-1 relative h-8 bg-gray-50 overflow-visible">
-                          {/* 전체 타임라인 배경 */}
-                          <div className="absolute inset-0 flex">
-                            {months.map((month, index) => {
-                              const monthStart = new Date(month.year, month.month - 1, 1)
-                              const baseDate = new Date('2024-01-01')
-                              const monthStartDays = Math.floor((monthStart.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24))
-                              const monthPosition = (monthStartDays / 150) * 100
-                              
-                              return (
-                                <div
-                                  key={`${month.year}-${month.month}`}
-                                  className="absolute top-0 bottom-0 w-px bg-gray-300"
-                                  style={{ left: `${monthPosition}%` }}
-                                />
-                              )
-                            })}
-                          </div>
+                        <div className="flex-1 relative h-0 bg-gray-50 overflow-visible">
                           
                           {/* 작업 막대 */}
                           <div
-                            className="absolute top-1 h-6 rounded opacity-80 flex items-center justify-center border border-gray-300"
+                            className="absolute top-0.5 h-5 rounded opacity-80 flex items-center justify-center border border-gray-500"
                             style={{
                               left: calculateTaskPosition(task.startDate, task.endDate).left,
                               width: calculateTaskPosition(task.startDate, task.endDate).width,
@@ -1583,7 +1833,7 @@ export default function WBSManagement() {
                             }}
                           >
                             <span 
-                              className="text-xs text-gray-800 font-medium px-1 whitespace-nowrap"
+                              className="text-[10px] text-gray-800 font-medium px-1 whitespace-nowrap"
                               style={{
                                 overflow: 'visible',
                                 textOverflow: 'unset',
@@ -1596,23 +1846,7 @@ export default function WBSManagement() {
                         </div>
                       ) : (
                         // 최하위가 아닌 경우 빈 공간
-                        <div className="flex-1 h-8 bg-gray-50">
-                          <div className="absolute inset-0">
-                            {months.map((month, index) => {
-                              const monthStart = new Date(month.year, month.month - 1, 1)
-                              const baseDate = new Date('2024-01-01')
-                              const monthStartDays = Math.floor((monthStart.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24))
-                              const monthPosition = (monthStartDays / 150) * 100
-                              
-                              return (
-                                <div
-                                  key={`${month.year}-${month.month}`}
-                                  className="absolute top-0 bottom-0 w-px bg-gray-300"
-                                  style={{ left: `${monthPosition}%` }}
-                                />
-                              )
-                            })}
-                          </div>
+                        <div className="flex-1 h-0 relative">
                         </div>
                       )}
                     </div>

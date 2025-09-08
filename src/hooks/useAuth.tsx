@@ -81,14 +81,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         // 기존 세션 확인
         const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('🔍 세션 확인 결과:', { session, error });
         
         if (error) {
           console.error('❌ Session retrieval error:', error);
-        } else if (session?.user) {
+          setLoading(false);
+          return;
+        } 
+        
+        if (session?.user) {
           console.log('👤 기존 세션에서 사용자 확인:', session.user.id);
+          console.log('🔑 사용자 토큰 유효성:', session.expires_at);
+          console.log('⏰ 현재 시간:', new Date().getTime() / 1000);
+          console.log('⏰ 토큰 만료 시간:', session.expires_at);
           setSession(session);
           setUser(session.user);
           await fetchUserProfile(session.user.id);
+        } else {
+          console.warn('⚠️ 세션에 사용자 정보가 없습니다.');
         }
         
         // Auth state listener 설정
@@ -108,7 +118,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         );
         
-        setLoading(false);
+        // 세션이 없는 경우에만 loading을 false로 설정
+        if (!session?.user) {
+          setLoading(false);
+        }
         
         return () => subscription.unsubscribe();
       } catch (error) {

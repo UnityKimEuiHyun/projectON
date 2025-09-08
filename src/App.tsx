@@ -15,7 +15,6 @@ import Settings from "./pages/Settings";
 import ProfileEdit from "./pages/ProfileEdit";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-import Organization from "./pages/Organization";
 import Timeline from "./pages/Timeline";
 import WBSManagement from "./pages/WBSManagement";
 import ProjectCostManagement from "./pages/ProjectCostManagement";
@@ -30,11 +29,14 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5분간 데이터를 fresh로 간주
-      cacheTime: 10 * 60 * 1000, // 10분간 캐시 유지
-      retry: 3, // 실패 시 3번 재시도
-      refetchOnWindowFocus: false, // 윈도우 포커스 시 자동 리페치 비활성화
+      staleTime: 5 * 60 * 1000, // 5분간 fresh로 간주
+      gcTime: 10 * 60 * 1000, // 10분간 캐시 유지
+      retry: 3, // 재시도 횟수
+      refetchOnWindowFocus: true, // 윈도우 포커스 시 리페치
       refetchOnMount: true, // 컴포넌트 마운트 시 리페치
+      refetchOnReconnect: true, // 네트워크 재연결 시 리페치
+      refetchInterval: false, // 자동 리페치 비활성화
+      refetchIntervalInBackground: false, // 백그라운드 리페치 비활성화
     },
   },
 });
@@ -123,13 +125,6 @@ const App = () => (
                 <ProtectedRoute>
                   <Layout>
                     <Team />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/organization" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Organization />
                   </Layout>
                 </ProtectedRoute>
               } />

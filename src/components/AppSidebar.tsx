@@ -8,7 +8,6 @@ import {
   Plus,
   LogOut,
   User,
-  Building2,
   BarChart3,
   DollarSign,
   ShoppingCart,
@@ -51,9 +50,8 @@ const mainItems = [
   { title: "캘린더", url: "/calendar", icon: Calendar },
 ]
 
-// 조직 관리 메뉴
-const organizationItems = [
-  { title: "조직 관리", url: "/organization", icon: Building2 },
+// 구성원 관리 메뉴
+const teamItems = [
   { title: "구성원 관리", url: "/team", icon: Users },
 ]
 
@@ -308,12 +306,12 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
 
-          {/* Organization Management */}
+          {/* Team Management */}
           <SidebarGroup>
-            <SidebarGroupLabel>조직 관리</SidebarGroupLabel>
+            <SidebarGroupLabel>구성원 관리</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {organizationItems.map((item) => renderMenuItem(item))}
+                {teamItems.map((item) => renderMenuItem(item))}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

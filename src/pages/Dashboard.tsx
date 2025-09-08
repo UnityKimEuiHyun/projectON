@@ -87,19 +87,28 @@ const Dashboard = () => {
     isLoading,
     error: projectsError
   } = useQuery({
-    queryKey: ['projects'],
+    queryKey: ['projects', user?.id], // 타임스탬프 제거
     queryFn: async () => {
       const projects = await ProjectService.getProjects()
       // 실제로는 사용자가 참여한 프로젝트만 필터링해야 함
       return projects.slice(0, 3) // 목업용으로 3개만 표시
-    }
+    },
+    enabled: !!user, // 사용자가 로그인된 상태에서만 실행
+    staleTime: 5 * 60 * 1000, // 5분간 fresh로 간주
+    gcTime: 10 * 60 * 1000, // 10분간 캐시 유지
+    refetchOnMount: true, // 마운트 시 리페치
+    refetchOnWindowFocus: true, // 윈도우 포커스 시 리페치
   })
 
   // React Query로 즐겨찾기 데이터 관리
   const { data: favoriteProjectIdsList = [] } = useQuery({
-    queryKey: ['favorites', user?.id],
+    queryKey: ['favorites', user?.id], // 타임스탬프 제거
     queryFn: () => FavoriteService.getUserFavorites(user!.id),
     enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5분간 fresh로 간주
+    gcTime: 10 * 60 * 1000, // 10분간 캐시 유지
+    refetchOnMount: true, // 마운트 시 리페치
+    refetchOnWindowFocus: true, // 윈도우 포커스 시 리페치
   })
 
   // 에러 처리
@@ -133,6 +142,7 @@ const Dashboard = () => {
     loadPersonalTasks()
     loadMentions()
   }, [])
+
 
   // 사이드바의 열린 프로젝트 상태와 동기화
   useEffect(() => {

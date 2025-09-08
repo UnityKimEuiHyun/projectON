@@ -73,7 +73,12 @@ export class ProjectService {
     }
     
     if (!user) {
-      console.warn('⚠️ 인증된 사용자가 없습니다. RLS 정책으로 인해 데이터 접근이 제한될 수 있습니다.')
+      console.error('❌ 인증된 사용자가 없습니다! RLS 정책으로 인해 데이터 접근이 불가능합니다.')
+      console.error('🔍 해결 방법:')
+      console.error('  1. 로그아웃 후 다시 로그인')
+      console.error('  2. 브라우저 쿠키/로컬스토리지 초기화')
+      console.error('  3. Supabase 인증 설정 확인')
+      return []
     }
     
     console.log('📡 프로젝트 테이블 쿼리 시작...')

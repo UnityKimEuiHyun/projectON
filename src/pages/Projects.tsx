@@ -247,7 +247,7 @@ const Projects = () => {
     isLoading, 
     error: projectsError 
   } = useQuery({
-    queryKey: ['projects'],
+    queryKey: ['projects', user?.id], // 타임스탬프 제거
     queryFn: async () => {
       console.log('🔍 DB 연결 테스트 시작...')
       try {
@@ -258,7 +258,12 @@ const Projects = () => {
         console.error('❌ DB 연결 실패:', dbError)
         throw new Error('프로젝트 목록을 불러오는데 실패했습니다.')
       }
-    }
+    },
+    enabled: !!user, // 사용자가 로그인된 상태에서만 실행
+    staleTime: 5 * 60 * 1000, // 5분간 fresh로 간주
+    gcTime: 10 * 60 * 1000, // 10분간 캐시 유지
+    refetchOnMount: true, // 마운트 시 리페치
+    refetchOnWindowFocus: true, // 윈도우 포커스 시 리페치
   })
 
   // 에러 처리
@@ -301,7 +306,10 @@ const Projects = () => {
     }
 
     window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+    }
   }, [])
 
   // React Query로 즐겨찾기 관리
@@ -309,9 +317,13 @@ const Projects = () => {
     data: favoriteProjectIds = [], 
     error: favoritesError 
   } = useQuery({
-    queryKey: ['favorites', user?.id],
+    queryKey: ['favorites', user?.id], // 타임스탬프 제거
     queryFn: () => FavoriteService.getUserFavorites(user!.id),
-    enabled: !!user
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5분간 fresh로 간주
+    gcTime: 10 * 60 * 1000, // 10분간 캐시 유지
+    refetchOnMount: true, // 마운트 시 리페치
+    refetchOnWindowFocus: true, // 윈도우 포커스 시 리페치
   })
 
   // 즐겨찾기 에러 처리
@@ -343,43 +355,35 @@ const Projects = () => {
 
   const loadUserPermissions = async () => {
     try {
-      // 사용자 권한 조회
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('authority')
-        .eq('user_id', user.id)
-        .single()
+      // 사용자 권한 조회 (기본값 설정)
+      setUserAuthority('member') // 기본 권한으로 설정
 
-      if (profile) {
-        setUserAuthority(profile.authority)
-      }
+      // 사용자가 소속된 기업 정보 조회 (현재는 비활성화)
+      // const { data: memberships } = await supabase
+      //   .from('group_members')
+      //   .select(`
+      //     group_id,
+      //     role,
+      //     groups (
+      //       id,
+      //       name
+      //     )
+      //   `)
+      //   .eq('user_id', user.id)
+      //   .eq('status', 'active')
 
-      // 사용자가 소속된 기업 정보 조회
-      const { data: memberships } = await supabase
-        .from('group_members')
-        .select(`
-          group_id,
-          role,
-          groups (
-            id,
-            name
-          )
-        `)
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-
-      if (memberships) {
-        const groupsMap: { [groupId: string]: any } = {}
-        memberships.forEach(membership => {
-          if (membership.groups) {
-            groupsMap[membership.group_id] = {
-              ...membership.groups,
-              role: membership.role
-            }
-          }
-        })
-        setUserGroups(groupsMap)
-      }
+      // if (memberships) {
+      //   const groupsMap: { [groupId: string]: any } = {}
+      //   memberships.forEach(membership => {
+      //     if (membership.groups) {
+      //       groupsMap[membership.group_id] = {
+      //         ...membership.groups,
+      //         role: membership.role
+      //       }
+      //     }
+      //   })
+      //   setUserGroups(groupsMap)
+      // }
     } catch (error) {
       console.error('사용자 권한 로드 실패:', error)
     }
@@ -405,9 +409,8 @@ const Projects = () => {
   }
 
   const handleProjectUpdated = (updatedProject: Project) => {
-    setProjects(prev => 
-      prev.map(p => p.id === updatedProject.id ? updatedProject : p)
-    )
+    // React Query 캐시 무효화로 최신 데이터 가져오기
+    queryClient.invalidateQueries({ queryKey: ['projects'] })
     toast({
       title: "성공",
       description: "프로젝트가 성공적으로 수정되었습니다.",
@@ -458,7 +461,8 @@ const Projects = () => {
   }
 
   const handleProjectCreated = (newProject: Project) => {
-    setProjects(prev => [newProject, ...prev])
+    // React Query 캐시 무효화로 최신 데이터 가져오기
+    queryClient.invalidateQueries({ queryKey: ['projects'] })
     toast({
       title: "성공",
       description: "프로젝트가 성공적으로 생성되었습니다.",
@@ -499,11 +503,11 @@ const Projects = () => {
     // 2. 프로젝트 생성자는 자신의 프로젝트 삭제 가능
     if (project.created_by === user.id) return true
     
-    // 3. 프로젝트가 할당된 기업의 관리자인 경우 삭제 가능
-    if (project.group_id && userGroups[project.group_id]) {
-      const groupInfo = userGroups[project.group_id]
-      return groupInfo.role === 'admin'
-    }
+    // 3. 프로젝트가 할당된 기업의 관리자인 경우 삭제 가능 (현재는 비활성화)
+    // if (project.group_id && userGroups[project.group_id]) {
+    //   const groupInfo = userGroups[project.group_id]
+    //   return groupInfo.role === 'admin'
+    // }
     
     return false
   }
@@ -521,7 +525,8 @@ const Projects = () => {
     if (confirm(`"${project.name}" 프로젝트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
       try {
         await ProjectService.deleteProject(project.id)
-        setProjects(prev => prev.filter(p => p.id !== project.id))
+        // React Query 캐시 무효화로 최신 데이터 가져오기
+        queryClient.invalidateQueries({ queryKey: ['projects'] })
         toast({
           title: "성공",
           description: "프로젝트가 성공적으로 삭제되었습니다.",
