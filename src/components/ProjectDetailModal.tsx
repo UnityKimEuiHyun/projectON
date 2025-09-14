@@ -33,12 +33,13 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
   const [isLoading, setIsLoading] = useState(false)
   const [userAuthority, setUserAuthority] = useState<string | null>(null)
   const [userGroups, setUserGroups] = useState<{ [groupId: string]: any }>({})
-
-  // 모달이 닫힐 때 편집 모드 초기화
-  const handleClose = () => {
-    setIsEditing(false)
-    onClose()
-  }
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [isLoadingTeam, setIsLoadingTeam] = useState(false)
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false)
+  const [projectCompany, setProjectCompany] = useState<Group | null>(null)
+  const [isLoadingCompany, setIsLoadingCompany] = useState(false)
+  const [userCompanies, setUserCompanies] = useState<Group[]>([])
+  const [isLoadingUserCompanies, setIsLoadingUserCompanies] = useState(false)
   
   const [formData, setFormData] = useState({
     name: project?.name || '',
@@ -50,8 +51,15 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
     due_date: project?.due_date ? project.due_date.split('T')[0] : '',
     team_size: project?.team_size || 1,
     priority: project?.priority || '',
-    progress: project?.progress || 0
+    progress: project?.progress || 0,
+    group_id: project?.group_id || ''
   })
+
+  // 모달이 닫힐 때 편집 모드 초기화
+  const handleClose = () => {
+    setIsEditing(false)
+    onClose()
+  }
 
   // project가 변경될 때마다 formData 업데이트
   useEffect(() => {
@@ -66,7 +74,8 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
         due_date: project.due_date ? project.due_date.split('T')[0] : '',
         team_size: project.team_size || 1,
         priority: project.priority,
-        progress: project.progress
+        progress: project.progress,
+        group_id: project.group_id || ''
       })
     }
   }, [project])
@@ -75,8 +84,16 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
   useEffect(() => {
     if (isOpen && user) {
       loadUserPermissions()
+      loadUserCompanies()
     }
   }, [isOpen, user])
+
+  // 프로젝트의 소속 기업 로드
+  useEffect(() => {
+    if (isOpen && project) {
+      loadProjectCompany()
+    }
+  }, [isOpen, project])
 
   // 프로젝트 팀 구성원 로드
   useEffect(() => {
@@ -86,6 +103,36 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
   }, [isOpen, project])
 
   if (!project) return null
+
+  const loadProjectCompany = async () => {
+    if (!project) return
+
+    try {
+      setIsLoadingCompany(true)
+      
+      if (!project.group_id) {
+        setProjectCompany(null)
+        return
+      }
+
+      const { data: company, error } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('id', project.group_id)
+        .single()
+
+      if (error) {
+        console.error('프로젝트 소속 기업 로드 실패:', error)
+        return
+      }
+
+      setProjectCompany(company)
+    } catch (error) {
+      console.error('프로젝트 소속 기업 로드 중 오류:', error)
+    } finally {
+      setIsLoadingCompany(false)
+    }
+  }
 
   const loadTeamMembers = async () => {
     if (!project) return
@@ -141,10 +188,49 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
     }
   }
 
+  const loadUserCompanies = async () => {
+    if (!user) return
+
+    try {
+      setIsLoadingUserCompanies(true)
+      
+      // 사용자가 소속된 기업 목록 조회
+      const { data: groupMembers, error: groupError } = await supabase
+        .from('group_members')
+        .select(`
+          group_id,
+          role,
+          groups!inner (
+            id,
+            name,
+            description,
+            created_by,
+            created_at,
+            updated_at
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('role', { ascending: false }) // owner가 먼저 오도록 정렬
+
+      if (groupError) {
+        console.error('사용자 소속 기업 로드 실패:', groupError)
+        return
+      }
+
+      const companies = groupMembers.map(item => item.groups)
+      setUserCompanies(companies)
+    } catch (error) {
+      console.error('사용자 소속 기업 로드 중 오류:', error)
+    } finally {
+      setIsLoadingUserCompanies(false)
+    }
+  }
+
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: field === 'group_id' && value === 'personal' ? '' : value
     }))
   }
 
@@ -179,7 +265,8 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
         estimate_note: formData.estimate_note || null,
         due_date: formData.due_date || null,
         team_size: formData.team_size,
-        progress: formData.progress
+        progress: formData.progress,
+        group_id: formData.group_id || null
       })
       
       toast({
@@ -228,16 +315,11 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
         due_date: project.due_date ? project.due_date.split('T')[0] : '',
         team_size: project.team_size || 1,
         priority: project.priority,
-        progress: project.progress
+        progress: project.progress,
+        group_id: project.group_id || ''
       })
     }
     setIsEditing(false)
-  }
-
-  // 팀원 추가
-  const handleAddTeamMembers = (selectedMembers: any[]) => {
-    setTeamMembers(prev => [...prev, ...selectedMembers])
-    setIsAddMemberModalOpen(false)
   }
 
   // 팀원 제거
@@ -273,10 +355,6 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
     }
   }
 
-  // 실제 팀 구성원 데이터
-  const [teamMembers, setTeamMembers] = useState<any[]>([])
-  const [isLoadingTeam, setIsLoadingTeam] = useState(false)
-  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false)
 
   return (
     <>
@@ -362,6 +440,86 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
                 </>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* 소속 기업 */}
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold flex items-center">
+            <Building className="w-5 h-5 mr-2" />
+            소속 기업
+          </h3>
+          <div className="p-4 bg-muted/50 rounded-lg">
+            {isEditing ? (
+              <div className="space-y-3">
+                <Label htmlFor="group_id" className="text-sm font-medium">소속 기업 선택</Label>
+                <Select 
+                  value={formData.group_id || 'personal'} 
+                  onValueChange={(value) => handleInputChange('group_id', value)}
+                  disabled={isLoading || isLoadingUserCompanies}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="소속 기업을 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="personal">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        <span>개인 프로젝트</span>
+                      </div>
+                    </SelectItem>
+                    {userCompanies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        <div className="flex items-center gap-2">
+                          <Building className="w-4 h-4" />
+                          <span>{company.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isLoadingUserCompanies && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <span>소속 기업 목록을 불러오는 중...</span>
+                  </div>
+                )}
+                {userCompanies.length === 0 && !isLoadingUserCompanies && (
+                  <p className="text-sm text-muted-foreground">
+                    소속된 기업이 없습니다. 기업을 먼저 등록해주세요.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <>
+                {isLoadingCompany ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <span>로딩 중...</span>
+                  </div>
+                ) : projectCompany ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                      <Building className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <div className="font-medium">{projectCompany.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {projectCompany.description || '설명 없음'}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      <span>개인 프로젝트</span>
+                    </div>
+                    <div className="text-sm mt-1">소속 기업이 없는 개인 프로젝트입니다.</div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
 
@@ -647,14 +805,6 @@ export function ProjectDetailModal({ project, isOpen, onClose, onProjectUpdated 
       </div>
     </Modal>
 
-    {/* Team Member Add Modal */}
-    <TeamMemberAddModal
-      isOpen={isAddMemberModalOpen}
-      onClose={() => setIsAddMemberModalOpen(false)}
-      onAddMembers={handleAddTeamMembers}
-      project={project}
-      existingMembers={teamMembers}
-    />
     </>
   )
 }

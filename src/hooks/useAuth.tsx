@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async (userId: string): Promise<void> => {
     try {
       console.log(`🔍 프로필 가져오기 시작:`, userId);
       
@@ -61,16 +61,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('❌ 프로필 가져오기 예외:', error);
       // 에러가 발생해도 기본 프로필 정보 설정
-              setUserProfile({
-          id: userId,
-          user_id: userId,
-          display_name: null,
-          email: null,
-          avatar_url: null,
-          phone: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
+      setUserProfile({
+        id: userId,
+        user_id: userId,
+        display_name: null,
+        email: null,
+        avatar_url: null,
+        phone: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
     }
   };
 
@@ -97,8 +97,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSession(session);
           setUser(session.user);
           await fetchUserProfile(session.user.id);
+          setLoading(false);
         } else {
           console.warn('⚠️ 세션에 사용자 정보가 없습니다.');
+          setLoading(false);
         }
         
         // Auth state listener 설정
@@ -118,10 +120,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         );
         
-        // 세션이 없는 경우에만 loading을 false로 설정
-        if (!session?.user) {
-          setLoading(false);
-        }
         
         return () => subscription.unsubscribe();
       } catch (error) {

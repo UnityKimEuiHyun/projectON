@@ -30,6 +30,8 @@ import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import type { Database } from "@/integrations/supabase/types"
 import InviteManagementModal from "@/components/InviteManagementModal"
+import CompanyCreateModal from "@/components/CompanyCreateModal"
+import { createCompany, getUserCompanies } from "@/services/companyService"
 
 type Group = Database['public']['Tables']['groups']['Row']
 type GroupMember = Database['public']['Tables']['group_members']['Row'] & {
@@ -52,6 +54,7 @@ const Team = () => {
   const [isLoadingMembers, setIsLoadingMembers] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [isInviteManagementModalOpen, setIsInviteManagementModalOpen] = useState(false)
+  const [isCompanyCreateModalOpen, setIsCompanyCreateModalOpen] = useState(false)
 
   // 소속된 기업이 있을 때만 해당 기업의 멤버들을 가져옴
   const filteredMembers = companyMembers.filter(member =>
@@ -426,6 +429,51 @@ const Team = () => {
     }
   }
 
+  // 기업 등록 핸들러
+  const handleCompanyCreated = async () => {
+    // 기업 등록 후 사용자의 기업 목록을 다시 로드
+    try {
+      const { data: affiliations, error } = await supabase
+        .from('group_members')
+        .select(`
+          groups (
+            id,
+            name,
+            description,
+            created_at,
+            updated_at
+          )
+        `)
+        .eq('user_id', user?.id)
+        .eq('status', 'active')
+      
+      if (error) {
+        console.error('기업 목록 새로고침 실패:', error)
+        return
+      }
+      
+      const affiliationsData = affiliations?.map(item => ({
+        id: item.groups.id,
+        name: item.groups.name,
+        description: item.groups.description,
+        parent_group_id: "",
+        created_by: "",
+        created_at: item.groups.created_at,
+        updated_at: item.groups.updated_at,
+      })).filter(group => group.id && group.name) || []
+      
+      setUserAffiliations(affiliationsData)
+      
+      if (affiliationsData.length > 0) {
+        // 가장 최근에 생성된 기업(마지막 기업)을 선택
+        const latestCompany = affiliationsData[affiliationsData.length - 1]
+        setSelectedGroup(latestCompany)
+      }
+    } catch (error) {
+      console.error('기업 목록 새로고침 실패:', error)
+    }
+  }
+
   // 멤버 제거 함수
   const handleRemoveMember = async (member: GroupMember) => {
     if (!user || !selectedGroup) return
@@ -509,10 +557,16 @@ const Team = () => {
           <h1 className="text-3xl font-bold">구성원 관리</h1>
           <p className="text-muted-foreground">팀 구성원을 관리하고 초대를 보내세요</p>
         </div>
-        <Button variant="outline" onClick={() => setIsInviteManagementModalOpen(true)}>
-          <UserPlus className="w-4 h-4 mr-2" />
-          초대 관리
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={() => setIsCompanyCreateModalOpen(true)}>
+            <Building2 className="w-4 h-4 mr-2" />
+            신규기업 등록
+          </Button>
+          <Button variant="outline" onClick={() => setIsInviteManagementModalOpen(true)}>
+            <UserPlus className="w-4 h-4 mr-2" />
+            초대 관리
+          </Button>
+        </div>
       </div>
 
       {/* User Affiliations */}
@@ -681,6 +735,16 @@ const Team = () => {
                                     나
                                   </span>
                                 )}
+                                {(member.role as string) === 'owner' && (
+                                  <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                    Owner
+                                  </span>
+                                )}
+                                {member.role === 'admin' && (
+                                  <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                    관리자
+                                  </span>
+                                )}
                               </h4>
                               {getStatusBadge(member.status || 'active')}
                             </div>
@@ -746,6 +810,16 @@ const Team = () => {
                                 나
                               </span>
                             )}
+                            {(member.role as string) === 'owner' && (
+                              <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                Owner
+                              </span>
+                            )}
+                            {member.role === 'admin' && (
+                              <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                관리자
+                              </span>
+                            )}
                           </h4>
                           <div className="flex items-center justify-center space-x-2">
                             {getStatusBadge(member.status || 'active')}
@@ -797,6 +871,13 @@ const Team = () => {
         isOpen={isInviteManagementModalOpen}
         onClose={() => setIsInviteManagementModalOpen(false)}
         selectedGroup={selectedGroup}
+      />
+
+      {/* 기업 등록 모달 */}
+      <CompanyCreateModal
+        open={isCompanyCreateModalOpen}
+        onOpenChange={setIsCompanyCreateModalOpen}
+        onCompanyCreated={handleCompanyCreated}
       />
     </div>
   )

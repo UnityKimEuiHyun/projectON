@@ -5,8 +5,10 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { BarChart3, Plus, Edit, Trash2, ChevronDown, ChevronRight, Calendar, User, Table, GanttChart, Filter, Download, Search, Minus, Plus as PlusIcon, UserPlus } from "lucide-react"
+import { BarChart3, Plus, Edit, Trash2, ChevronDown, ChevronRight, Calendar, User, Table, GanttChart, Filter, Download, Search, Minus, Plus as PlusIcon, UserPlus, Building2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { getCompanyMembers, getUserCompanies, type CompanyMember } from "@/services/companyService"
+import { ProjectService } from "@/services/projectService"
 
 // 드롭다운 스타일을 위한 CSS
 const dropdownStyles = `
@@ -164,7 +166,7 @@ export default function WBSManagement() {
   }
 
   // 임시 데이터 - 실제로는 API에서 가져올 예정
-  const projects = [
+  const tempProjects = [
     { id: "1", name: "웹사이트 리뉴얼 프로젝트" },
     { id: "2", name: "모바일 앱 개발" },
   ]
@@ -407,10 +409,10 @@ export default function WBSManagement() {
   ]
 
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
-  const [selectedProject, setSelectedProject] = useState<string>("1")
   const [viewMode, setViewMode] = useState<'table' | 'gantt'>('table')
   const [zoomLevel, setZoomLevel] = useState<number>(1)
   const [levelFilters, setLevelFilters] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]))
+  const [allExpanded, setAllExpanded] = useState(false)
   const [tasks, setTasks] = useState<WBSTask[]>(wbsTasks)
   
   // 담당자 모달 상태
@@ -422,18 +424,141 @@ export default function WBSManagement() {
   const [taskDetailModalOpen, setTaskDetailModalOpen] = useState(false)
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<WBSTask | null>(null)
   
-  // 구성원 데이터 (실제로는 API에서 가져올 예정)
-  const teamMembers = [
-    { id: "1", name: "김의현", email: "ehkim1130@gmail.com", role: "프로젝트 매니저" },
-    { id: "2", name: "김의현2", email: "ehkim2@company.com", role: "분석가" },
-    { id: "3", name: "김분석", email: "kim.analysis@company.com", role: "분석가" },
-    { id: "4", name: "박계획", email: "park.planning@company.com", role: "기획자" },
-    { id: "5", name: "이디자인", email: "lee.design@company.com", role: "디자이너" },
-    { id: "6", name: "최그래픽", email: "choi.graphic@company.com", role: "그래픽 디자이너" },
-    { id: "7", name: "최프로토", email: "choi.prototype@company.com", role: "프로토타이퍼" },
-    { id: "8", name: "김프론트", email: "kim.frontend@company.com", role: "프론트엔드 개발자" },
-    { id: "9", name: "박백엔드", email: "park.backend@company.com", role: "백엔드 개발자" }
-  ]
+  // 기업 멤버 상태
+  const [companyMembers, setCompanyMembers] = useState<CompanyMember[]>([])
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("")
+  const [userCompanies, setUserCompanies] = useState<any[]>([])
+  const [projects, setProjects] = useState<any[]>([])
+  const [selectedProject, setSelectedProject] = useState<any>(null)
+  const [selectedProjectCompany, setSelectedProjectCompany] = useState<any>(null)
+  
+
+  // 기업 멤버를 teamMembers 형태로 변환
+  const getTeamMembers = () => {
+    console.log('getTeamMembers 호출됨, companyMembers:', companyMembers)
+    console.log('companyMembers.length:', companyMembers.length)
+    console.log('selectedCompanyId:', selectedCompanyId)
+    
+    // 선택된 기업의 멤버가 있으면 변환하여 반환
+    if (companyMembers.length > 0) {
+      const convertedMembers = companyMembers.map(member => {
+        console.log('멤버 변환 중:', member)
+        return {
+          id: member.user_id,
+          name: member.display_name || '이름 없음',
+          email: member.email || '',
+          role: member.role === 'owner' ? 'Owner' : 
+                member.role === 'admin' ? '관리자' : '멤버'
+        }
+      })
+      console.log('변환된 멤버들:', convertedMembers)
+      return convertedMembers
+    }
+    
+    // 기본 구성원 데이터 (기업이 선택되지 않았거나 멤버가 없는 경우)
+    return [
+      { id: "1", name: "김의현", email: "ehkim1130@gmail.com", role: "프로젝트 매니저" },
+      { id: "2", name: "김의현2", email: "ehkim2@company.com", role: "분석가" },
+      { id: "3", name: "김분석", email: "kim.analysis@company.com", role: "분석가" },
+      { id: "4", name: "박계획", email: "park.planning@company.com", role: "기획자" },
+      { id: "5", name: "이디자인", email: "lee.design@company.com", role: "디자이너" },
+      { id: "6", name: "최그래픽", email: "choi.graphic@company.com", role: "그래픽 디자이너" },
+      { id: "7", name: "최프로토", email: "choi.prototype@company.com", role: "프로토타이퍼" },
+      { id: "8", name: "김프론트", email: "kim.frontend@company.com", role: "프론트엔드 개발자" },
+      { id: "9", name: "박백엔드", email: "park.backend@company.com", role: "백엔드 개발자" }
+    ]
+  }
+
+  const teamMembers = React.useMemo(() => getTeamMembers(), [companyMembers, selectedCompanyId])
+
+  // 컴포넌트 마운트 시 프로젝트 목록과 기업 목록 로드
+  React.useEffect(() => {
+    console.log('🚀 WBSManagement useEffect 실행됨')
+    const loadData = async () => {
+      try {
+        // 프로젝트 목록 로드
+        console.log('🔍 프로젝트 목록 로드 시작')
+        const projectsData = await ProjectService.getProjects()
+        console.log('프로젝트 목록:', projectsData)
+        setProjects(projectsData)
+        
+        // 첫 번째 프로젝트를 기본으로 선택
+        if (projectsData.length > 0) {
+          setSelectedProject(projectsData[0])
+        }
+        
+        // 기업 목록 로드
+        console.log('🔍 getUserCompanies 호출 시작')
+        const companies = await getUserCompanies()
+        console.log('사용자 기업 목록:', companies)
+        setUserCompanies(companies)
+        
+        if (companies.length > 0) {
+          // owner인 기업을 우선적으로 선택, 없으면 첫 번째 기업 선택
+          const ownerCompany = companies.find(company => 
+            company.user_role === 'owner'
+          ) || companies[0]
+          
+          console.log('선택된 기업:', ownerCompany)
+          setSelectedCompanyId(ownerCompany.id)
+        } else {
+          console.log('사용자가 소속된 기업이 없습니다.')
+        }
+      } catch (error) {
+        console.error('데이터 로드 실패:', error)
+      }
+    }
+
+    loadData()
+  }, [])
+
+  // 선택된 프로젝트가 변경될 때 해당 프로젝트의 기업 정보 로드
+  React.useEffect(() => {
+    const loadProjectCompany = async () => {
+      if (selectedProject && selectedProject.group_id) {
+        console.log('선택된 프로젝트의 기업 ID:', selectedProject.group_id)
+        try {
+          // 프로젝트의 기업 정보 찾기
+          const projectCompany = userCompanies.find(company => company.id === selectedProject.group_id)
+          if (projectCompany) {
+            setSelectedProjectCompany(projectCompany)
+            setSelectedCompanyId(projectCompany.id)
+            console.log('프로젝트의 기업 정보:', projectCompany)
+          } else {
+            console.log('프로젝트의 기업 정보를 찾을 수 없습니다.')
+            setSelectedProjectCompany(null)
+          }
+        } catch (error) {
+          console.error('프로젝트 기업 정보 로드 실패:', error)
+        }
+      } else {
+        console.log('선택된 프로젝트가 없거나 기업이 할당되지 않았습니다.')
+        setSelectedProjectCompany(null)
+      }
+    }
+
+    loadProjectCompany()
+  }, [selectedProject, userCompanies])
+
+  // 선택된 기업이 변경될 때마다 멤버 목록 로드
+  React.useEffect(() => {
+    const loadCompanyMembers = async () => {
+      if (selectedCompanyId) {
+        console.log('선택된 기업 ID:', selectedCompanyId)
+        try {
+          const members = await getCompanyMembers(selectedCompanyId)
+          console.log('선택된 기업 멤버 목록:', members)
+          setCompanyMembers(members)
+        } catch (error) {
+          console.error('기업 멤버 목록 로드 실패:', error)
+        }
+      } else {
+        console.log('선택된 기업이 없습니다.')
+      }
+    }
+
+    loadCompanyMembers()
+  }, [selectedCompanyId])
 
   // 진행률 업데이트 함수
   const updateTaskProgress = (taskId: string, newProgress: number) => {
@@ -501,10 +626,12 @@ export default function WBSManagement() {
   }
 
   // 검색된 구성원 필터링
-  const filteredMembers = teamMembers.filter(member =>
-    member.name.toLowerCase().includes(assigneeSearchTerm.toLowerCase()) ||
-    member.email.toLowerCase().includes(assigneeSearchTerm.toLowerCase()) ||
-    member.role.toLowerCase().includes(assigneeSearchTerm.toLowerCase())
+  const filteredMembers = React.useMemo(() => 
+    teamMembers.filter(member =>
+      member.name.toLowerCase().includes(assigneeSearchTerm.toLowerCase()) ||
+      member.email.toLowerCase().includes(assigneeSearchTerm.toLowerCase()) ||
+      member.role.toLowerCase().includes(assigneeSearchTerm.toLowerCase())
+    ), [teamMembers, assigneeSearchTerm]
   )
 
   // Task 상세 모달 열기
@@ -772,6 +899,29 @@ export default function WBSManagement() {
       newFilters.add(level)
     }
     setLevelFilters(newFilters)
+  }
+
+  // 모두 펼치기/접기 함수
+  const toggleAllExpanded = () => {
+    if (allExpanded) {
+      // 모두 접기
+      setExpandedTasks(new Set())
+      setAllExpanded(false)
+    } else {
+      // 모두 펼치기 - 모든 작업 ID를 수집
+      const allTaskIds = new Set<string>()
+      const collectTaskIds = (taskList: WBSTask[]) => {
+        taskList.forEach(task => {
+          allTaskIds.add(task.id)
+          if (task.children) {
+            collectTaskIds(task.children)
+          }
+        })
+      }
+      collectTaskIds(tasks)
+      setExpandedTasks(allTaskIds)
+      setAllExpanded(true)
+    }
   }
 
   // 모든 작업을 평면적으로 추출하는 함수 (표 뷰용)
@@ -1376,13 +1526,34 @@ export default function WBSManagement() {
       <Dialog open={assigneeModalOpen} onOpenChange={setAssigneeModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>담당자 선택</DialogTitle>
+            <DialogTitle>담당자 관리</DialogTitle>
             <DialogDescription>
               작업의 담당자를 선택하세요.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
+            {/* 프로젝트 기업 정보 표시 */}
+            {selectedProjectCompany ? (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-800">
+                    {selectedProjectCompany.name}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-800">
+                    개인 프로젝트
+                  </span>
+                </div>
+              </div>
+            )}
+            
             {/* 검색 입력 */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -1397,22 +1568,32 @@ export default function WBSManagement() {
             {/* 구성원 목록 */}
             <div className="max-h-60 overflow-y-auto space-y-2">
               {filteredMembers.length > 0 ? (
-                filteredMembers.map((member) => (
-                  <div
-                    key={member.id}
-                    onClick={() => selectAssignee(member)}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4 text-primary" />
+                filteredMembers.map((member) => {
+                  console.log('렌더링 중인 멤버:', member, 'role === Owner?', member.role === 'Owner')
+                  return (
+                    <div
+                      key={member.id}
+                      onClick={() => selectAssignee(member)}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                        <User className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm flex items-center gap-2">
+                          {member.name}
+                          {member.role === 'Owner' && (
+                            <Badge variant="secondary" className="text-xs">
+                              Owner
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">{member.email}</div>
+                        <div className="text-xs text-gray-400">{member.role}</div>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm">{member.name}</div>
-                      <div className="text-xs text-gray-500 truncate">{member.email}</div>
-                      <div className="text-xs text-gray-400">{member.role}</div>
-                    </div>
-                  </div>
-                ))
+                  )
+                })
               ) : (
                 <div className="text-center py-8 text-gray-500">
                   <User className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -1535,6 +1716,7 @@ export default function WBSManagement() {
           )}
         </DialogContent>
       </Dialog>
+
       
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -1542,6 +1724,50 @@ export default function WBSManagement() {
         <div>
           <h1 className="text-3xl font-bold">WBS 관리</h1>
           <p className="text-muted-foreground">프로젝트 작업 분할 구조(WBS)를 관리할 수 있습니다.</p>
+        </div>
+      </div>
+      
+      {/* 프로젝트 선택 */}
+      <div className="mb-6">
+        <div className="flex items-center gap-4">
+          <div className="flex-1 max-w-md">
+            <label className="text-sm font-medium text-gray-700 mb-2 block">프로젝트 선택</label>
+            <Select 
+              value={selectedProject?.id || ''} 
+              onValueChange={(value) => {
+                const project = projects.find(p => p.id === value)
+                setSelectedProject(project)
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="프로젝트를 선택하세요" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{project.name}</span>
+                      {(project as any).group_id && (
+                        <Badge variant="outline" className="text-xs">
+                          기업 프로젝트
+                        </Badge>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {selectedProject && (
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">{selectedProject.name}</span>
+              {(selectedProject as any).group_id ? (
+                <span className="ml-2 text-blue-600">• 기업 프로젝트</span>
+              ) : (
+                <span className="ml-2 text-gray-500">• 개인 프로젝트</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1653,21 +1879,46 @@ export default function WBSManagement() {
               <div className="p-4 bg-white border border-gray-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   {/* 필터 컨트롤 - 좌측 */}
-                  <div className="flex items-center gap-2">
-                    <Filter className="w-4 h-4" />
-                    <span className="text-sm font-medium">레벨 필터:</span>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map(level => (
-                        <Button
-                          key={level}
-                          variant={levelFilters.has(level) ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => toggleLevelFilter(level)}
-                          className="w-8 h-8 p-0"
-                        >
-                          L{level}
-                        </Button>
-                      ))}
+                  <div className="flex items-center gap-4">
+                    {/* 모두 펼치기/접기 버튼 */}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={toggleAllExpanded}
+                        className="flex items-center gap-1"
+                      >
+                        {allExpanded ? (
+                          <>
+                            <ChevronDown className="w-4 h-4" />
+                            모두 접기
+                          </>
+                        ) : (
+                          <>
+                            <ChevronRight className="w-4 h-4" />
+                            모두 펼치기
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    
+                    {/* 레벨 필터 */}
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-4 h-4" />
+                      <span className="text-sm font-medium">레벨 필터:</span>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map(level => (
+                          <Button
+                            key={level}
+                            variant={levelFilters.has(level) ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => toggleLevelFilter(level)}
+                            className="w-8 h-8 p-0"
+                          >
+                            L{level}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 

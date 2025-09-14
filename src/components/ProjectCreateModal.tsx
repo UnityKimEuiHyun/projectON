@@ -10,6 +10,7 @@ import { Slider } from './ui/slider'
 import { ProjectService } from '@/services/projectService'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/useAuth'
+import { getUserCompanies } from '@/services/companyService'
 import type { Database } from '@/integrations/supabase/types'
 
 type Project = Database['public']['Tables']['projects']['Row']
@@ -39,6 +40,22 @@ export function ProjectCreateModal({ isOpen, onClose, onProjectCreated }: Projec
   })
 
   const [isLoading, setIsLoading] = useState(false)
+  const [userCompanies, setUserCompanies] = useState<any[]>([])
+
+  // 사용자 기업 목록 로드
+  React.useEffect(() => {
+    const loadUserCompanies = async () => {
+      if (user) {
+        try {
+          const companies = await getUserCompanies()
+          setUserCompanies(companies)
+        } catch (error) {
+          console.error('기업 목록 로드 실패:', error)
+        }
+      }
+    }
+    loadUserCompanies()
+  }, [user])
 
   const handleInputChange = (field: string, value: string | number | null) => {
     setFormData(prev => ({
@@ -126,6 +143,32 @@ export function ProjectCreateModal({ isOpen, onClose, onProjectCreated }: Projec
       size="lg"
     >
       <div className="max-h-[60vh] overflow-y-auto space-y-4 pr-2">
+        {/* 기업 선택 */}
+        <div>
+          <Label htmlFor="group_id">소속 기업 *</Label>
+          <Select value={formData.group_id || 'personal'} onValueChange={(value) => handleInputChange('group_id', value === 'personal' ? null : value)}>
+            <SelectTrigger disabled={isLoading}>
+              <SelectValue placeholder="기업을 선택하세요" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="personal">개인 프로젝트</SelectItem>
+              {userCompanies.map((company) => (
+                <SelectItem key={company.id} value={company.id}>
+                  <div className="flex items-center justify-between w-full">
+                    <span>{company.name}</span>
+                    {company.user_role === 'owner' && (
+                      <span className="ml-2 text-xs text-yellow-600">Owner</span>
+                    )}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-1">
+            프로젝트를 할당할 기업을 선택하세요. 개인 프로젝트로 생성하려면 "개인 프로젝트"를 선택하세요.
+          </p>
+        </div>
+
         {/* 프로젝트명 */}
         <div>
           <Label htmlFor="name">프로젝트명 *</Label>
@@ -261,35 +304,6 @@ export function ProjectCreateModal({ isOpen, onClose, onProjectCreated }: Projec
           </Select>
         </div>
 
-        {/* 기업 할당 */}
-        <div>
-          <Label htmlFor="group_id">기업 할당 (선택사항)</Label>
-          <Input
-            id="group_id"
-            value={formData.group_id || ''}
-            onChange={(e) => handleInputChange('group_id', e.target.value)}
-            disabled={isLoading}
-            placeholder="기업 ID를 입력하세요 (예: d2a146c8-09ef-4add-bc8b-5e14643c326e)"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            기업 ID를 입력하면 해당 기업에 프로젝트가 할당됩니다. 비워두면 개인 프로젝트로 생성됩니다.
-          </p>
-        </div>
-
-        {/* 기업 할당 */}
-        <div>
-          <Label htmlFor="group_id">기업 할당 (선택사항)</Label>
-          <Input
-            id="group_id"
-            value={formData.group_id || ''}
-            onChange={(e) => handleInputChange('group_id', e.target.value)}
-            disabled={isLoading}
-            placeholder="기업 ID를 입력하세요 (예: d2a146c8-09ef-4add-bc8b-5e14643c326e)"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            기업 ID를 입력하면 해당 기업에 프로젝트가 할당됩니다. 비워두면 개인 프로젝트로 생성됩니다.
-          </p>
-        </div>
 
 
       </div>

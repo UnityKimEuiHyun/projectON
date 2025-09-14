@@ -95,7 +95,7 @@ export type Database = {
           id: string
           group_id: string
           user_id: string
-          role: 'admin' | 'member'
+          role: 'owner' | 'admin' | 'member'
           status: 'active' | 'inactive' | 'pending' | 'suspended'
           joined_at: string
         }
@@ -208,6 +208,55 @@ export type Database = {
           {
             foreignKeyName: "projects_created_by_fkey"
             columns: ["created_by"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
+      cost_management_shares: {
+        Row: {
+          id: string
+          project_id: string
+          shared_by_user_id: string
+          shared_with_user_id: string
+          permission_type: 'view' | 'edit'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          shared_by_user_id: string
+          shared_with_user_id: string
+          permission_type: 'view' | 'edit'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          shared_by_user_id?: string
+          shared_with_user_id?: string
+          permission_type?: 'view' | 'edit'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_management_shares_project_id_fkey"
+            columns: ["project_id"]
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cost_management_shares_shared_by_user_id_fkey"
+            columns: ["shared_by_user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cost_management_shares_shared_with_user_id_fkey"
+            columns: ["shared_with_user_id"]
             referencedRelation: "users"
             referencedColumns: ["id"]
           }

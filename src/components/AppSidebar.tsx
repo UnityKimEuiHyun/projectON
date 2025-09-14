@@ -25,6 +25,7 @@ import {
 import { NavLink, useLocation } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
 import { ProjectCreateModal } from "./ProjectCreateModal"
+import { supabase } from "@/integrations/supabase/client"
 import type { Database } from "@/integrations/supabase/types"
 
 import {
@@ -62,16 +63,26 @@ const projectManagementItems = [
 ]
 
 // 열린 프로젝트 관리 메뉴 (동적으로 생성됨)
-const getOpenProjectItems = (projectName: string) => [
-  { title: "프로젝트 요약", url: "/projects/summary", icon: BarChart3 },
-  { title: "WBS 관리", url: "/projects/wbs", icon: BarChart3 },
-  { title: "비용 관리", url: "/projects/cost", icon: DollarSign },
-  { title: "재산 관리", url: "/projects/expense", icon: ShoppingCart },
-  { title: "일일 보고서", url: "/projects/daily-report", icon: FileText },
-  { title: "주간 보고서", url: "/projects/weekly-report", icon: ClipboardList },
-  { title: "프로젝트 로그", url: "/projects/log", icon: BookOpen },
-  { title: "회의록", url: "/projects/meetings", icon: MessageSquare },
-]
+const getOpenProjectItems = (projectName: string, userRole: string | null) => {
+  const allItems = [
+    { title: "프로젝트 요약", url: "/projects/summary", icon: BarChart3 },
+    { title: "WBS 관리", url: "/projects/wbs", icon: BarChart3 },
+    { title: "비용 관리", url: "/projects/cost", icon: DollarSign, requiresAdmin: true },
+    { title: "자산 관리", url: "/projects/expense", icon: ShoppingCart },
+    { title: "일일 보고서", url: "/projects/daily-report", icon: FileText },
+    { title: "주간 보고서", url: "/projects/weekly-report", icon: ClipboardList },
+    { title: "프로젝트 로그", url: "/projects/log", icon: BookOpen },
+    { title: "회의록", url: "/projects/meetings", icon: MessageSquare },
+  ]
+
+  // Owner 권한이 있는 경우에만 비용 관리 표시
+  return allItems.filter(item => {
+    if (item.requiresAdmin) {
+      return userRole === 'owner'
+    }
+    return true
+  })
+}
 
 const settingsItems = [
   { title: "설정", url: "/settings", icon: Settings },
@@ -88,6 +99,29 @@ export function AppSidebar() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [showProjectSubMenu, setShowProjectSubMenu] = useState(false)
   const [openProject, setOpenProject] = useState<Project | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
+
+  // 사용자 권한 로드
+  useEffect(() => {
+    const loadUserRole = async () => {
+      if (user) {
+        try {
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('authority')
+            .eq('user_id', user.id)
+            .single()
+
+          if (!error && profile) {
+            setUserRole(profile.authority)
+          }
+        } catch (error) {
+          console.error('사용자 권한 로드 실패:', error)
+        }
+      }
+    }
+    loadUserRole()
+  }, [user])
 
   // 프로젝트 선택 상태를 localStorage에서 복원
   useEffect(() => {
@@ -356,7 +390,7 @@ export function AppSidebar() {
                     </p>
                   </div>
                   <SidebarMenu>
-                    {getOpenProjectItems(openProject.name).map((item) => renderMenuItem(item))}
+                    {getOpenProjectItems(openProject.name, userRole).map((item) => renderMenuItem(item))}
                   </SidebarMenu>
                 </>
               ) : (

@@ -123,7 +123,7 @@ const AssetManagement = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">재산 관리</h1>
+          <h1 className="text-3xl font-bold">자산 관리</h1>
           <p className="text-muted-foreground">회사 자산을 체계적으로 관리하세요</p>
         </div>
         <Button>
