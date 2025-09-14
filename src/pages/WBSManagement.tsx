@@ -1,11 +1,12 @@
 import React, { useState } from "react"
+import { useLocation } from "react-router-dom"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { BarChart3, Plus, Edit, Trash2, ChevronDown, ChevronRight, Calendar, User, Table, GanttChart, Filter, Download, Search, Minus, Plus as PlusIcon, UserPlus, Building2 } from "lucide-react"
+import { BarChart3, Plus, Edit, Trash2, ChevronDown, ChevronRight, Calendar, User, Table, GanttChart, Filter, Download, Search, Minus, Plus as PlusIcon, UserPlus, Building2, Workflow, Target, FolderOpen, List } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getCompanyMembers, getUserCompanies, type CompanyMember } from "@/services/companyService"
 import { ProjectService } from "@/services/projectService"
@@ -57,6 +58,7 @@ interface WBSTask {
 
 export default function WBSManagement() {
   const { toast } = useToast()
+  const location = useLocation()
   
   // Lv1 테마색 정의
   const getThemeColor = (taskId: string, level: number) => {
@@ -429,7 +431,7 @@ export default function WBSManagement() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("")
   const [userCompanies, setUserCompanies] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
-  const [selectedProject, setSelectedProject] = useState<any>(null)
+  const [activeProject, setActiveProject] = useState<any>(null)
   const [selectedProjectCompany, setSelectedProjectCompany] = useState<any>(null)
   
 
@@ -471,28 +473,34 @@ export default function WBSManagement() {
 
   const teamMembers = React.useMemo(() => getTeamMembers(), [companyMembers, selectedCompanyId])
 
-  // 컴포넌트 마운트 시 프로젝트 목록과 기업 목록 로드
+  // 컴포넌트 마운트 및 페이지 이동 시 프로젝트 목록과 기업 목록 로드
   React.useEffect(() => {
-    console.log('🚀 WBSManagement useEffect 실행됨')
+    console.log('🚀 WBSManagement useEffect 실행됨 - 페이지 간 이동 감지')
     const loadData = async () => {
       try {
-        // 프로젝트 목록 로드
-        console.log('🔍 프로젝트 목록 로드 시작')
-        const projectsData = await ProjectService.getProjects()
-        console.log('프로젝트 목록:', projectsData)
-        setProjects(projectsData)
-        
-        // 첫 번째 프로젝트를 기본으로 선택
-        if (projectsData.length > 0) {
-          setSelectedProject(projectsData[0])
-        }
-        
-        // 기업 목록 로드
+        // 1. 먼저 기업 목록 로드 (항상 최신 데이터)
         console.log('🔍 getUserCompanies 호출 시작')
         const companies = await getUserCompanies()
         console.log('사용자 기업 목록:', companies)
         setUserCompanies(companies)
         
+        // 2. 그 다음 활성화된 프로젝트 로드
+        console.log('🔍 활성화된 프로젝트 로드 시작')
+        const savedOpenProject = localStorage.getItem('openProject')
+        if (savedOpenProject) {
+          const project = JSON.parse(savedOpenProject)
+          console.log('localStorage에서 활성화된 프로젝트:', project)
+          setActiveProject(project)
+        } else {
+          // 활성화된 프로젝트가 없으면 첫 번째 프로젝트 로드
+          const projectsData = await ProjectService.getProjects()
+          console.log('프로젝트 목록:', projectsData)
+          if (projectsData.length > 0) {
+            setActiveProject(projectsData[0])
+          }
+        }
+        
+        // 3. 기업 선택 로직
         if (companies.length > 0) {
           // owner인 기업을 우선적으로 선택, 없으면 첫 번째 기업 선택
           const ownerCompany = companies.find(company => 
@@ -510,16 +518,112 @@ export default function WBSManagement() {
     }
 
     loadData()
+  }, []) // 마운트 시에만 실행
+
+  // 페이지 이동 감지 - F5와 동일한 처리
+  React.useEffect(() => {
+    console.log('🔄 WBS 페이지 이동 감지:', location.pathname)
+    const loadData = async () => {
+      try {
+        // 1. 먼저 기업 목록 로드 (항상 최신 데이터)
+        console.log('🔍 getUserCompanies 호출 시작')
+        const companies = await getUserCompanies()
+        console.log('사용자 기업 목록:', companies)
+        setUserCompanies(companies)
+        
+        // 2. 그 다음 활성화된 프로젝트 로드
+        console.log('🔍 활성화된 프로젝트 로드 시작')
+        const savedOpenProject = localStorage.getItem('openProject')
+        if (savedOpenProject) {
+          const project = JSON.parse(savedOpenProject)
+          console.log('localStorage에서 활성화된 프로젝트:', project)
+          setActiveProject(project)
+        } else {
+          // 활성화된 프로젝트가 없으면 첫 번째 프로젝트 로드
+          const projectsData = await ProjectService.getProjects()
+          console.log('프로젝트 목록:', projectsData)
+          if (projectsData.length > 0) {
+            setActiveProject(projectsData[0])
+          }
+        }
+        
+        // 3. 기업 선택 로직
+        if (companies.length > 0) {
+          // owner인 기업을 우선적으로 선택, 없으면 첫 번째 기업 선택
+          const ownerCompany = companies.find(company => 
+            company.user_role === 'owner'
+          ) || companies[0]
+          
+          console.log('선택된 기업:', ownerCompany)
+          setSelectedCompanyId(ownerCompany.id)
+        } else {
+          console.log('사용자가 소속된 기업이 없습니다.')
+        }
+      } catch (error) {
+        console.error('페이지 이동 시 데이터 로드 실패:', error)
+      }
+    }
+
+    loadData()
+  }, [location.pathname])
+
+  // 페이지 포커스 시 데이터 새로고침
+  React.useEffect(() => {
+    const handleFocus = () => {
+      console.log('🔄 페이지 포커스 감지 - 데이터 새로고침')
+      const loadData = async () => {
+        try {
+          const companies = await getUserCompanies()
+          setUserCompanies(companies)
+          
+          const savedOpenProject = localStorage.getItem('openProject')
+          if (savedOpenProject) {
+            const project = JSON.parse(savedOpenProject)
+            setActiveProject(project)
+          }
+        } catch (error) {
+          console.error('포커스 시 데이터 로드 실패:', error)
+        }
+      }
+      loadData()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [])
+
+  // localStorage 변경 감지 (다른 탭에서 프로젝트 변경 시)
+  React.useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'openProject') {
+        console.log('🔄 localStorage에서 프로젝트 변경 감지됨')
+        if (e.newValue) {
+          try {
+            const project = JSON.parse(e.newValue)
+            console.log('새로운 활성화된 프로젝트:', project)
+            setActiveProject(project)
+          } catch (error) {
+            console.error('프로젝트 파싱 실패:', error)
+          }
+        } else {
+          console.log('활성화된 프로젝트가 제거됨')
+          setActiveProject(null)
+        }
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
   }, [])
 
   // 선택된 프로젝트가 변경될 때 해당 프로젝트의 기업 정보 로드
   React.useEffect(() => {
     const loadProjectCompany = async () => {
-      if (selectedProject && selectedProject.group_id) {
-        console.log('선택된 프로젝트의 기업 ID:', selectedProject.group_id)
+      if (activeProject && activeProject.group_id) {
+        console.log('활성화된 프로젝트의 기업 ID:', activeProject.group_id)
         try {
           // 프로젝트의 기업 정보 찾기
-          const projectCompany = userCompanies.find(company => company.id === selectedProject.group_id)
+          const projectCompany = userCompanies.find(company => company.id === activeProject.group_id)
           if (projectCompany) {
             setSelectedProjectCompany(projectCompany)
             setSelectedCompanyId(projectCompany.id)
@@ -538,7 +642,7 @@ export default function WBSManagement() {
     }
 
     loadProjectCompany()
-  }, [selectedProject, userCompanies])
+  }, [activeProject, userCompanies])
 
   // 선택된 기업이 변경될 때마다 멤버 목록 로드
   React.useEffect(() => {
@@ -820,9 +924,14 @@ export default function WBSManagement() {
     // 전체 타임라인 길이 (2024년 1월~5월 = 150일)
     const totalDays = 150
     
+    // px 단위로 변환 (월별 200px)
+    const totalWidth = months.length * 200
+    const leftPx = (startDays / totalDays) * totalWidth
+    const widthPx = (durationDays / totalDays) * totalWidth
+    
     return {
-      left: `${(startDays / totalDays) * 100}%`,
-      width: `${(durationDays / totalDays) * 100}%`
+      left: `${leftPx}px`,
+      width: `${widthPx}px`
     }
   }
 
@@ -1519,7 +1628,7 @@ export default function WBSManagement() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="p-6 space-y-6">
       <style dangerouslySetInnerHTML={{ __html: dropdownStyles }} />
       
       {/* 담당자 선택 모달 */}
@@ -1717,62 +1826,16 @@ export default function WBSManagement() {
         </DialogContent>
       </Dialog>
 
-      
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-        <BarChart3 className="w-8 h-8 text-primary" />
-        <div>
-          <h1 className="text-3xl font-bold">WBS 관리</h1>
-          <p className="text-muted-foreground">프로젝트 작업 분할 구조(WBS)를 관리할 수 있습니다.</p>
-        </div>
-      </div>
-      
-      {/* 프로젝트 선택 */}
-      <div className="mb-6">
-        <div className="flex items-center gap-4">
-          <div className="flex-1 max-w-md">
-            <label className="text-sm font-medium text-gray-700 mb-2 block">프로젝트 선택</label>
-            <Select 
-              value={selectedProject?.id || ''} 
-              onValueChange={(value) => {
-                const project = projects.find(p => p.id === value)
-                setSelectedProject(project)
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="프로젝트를 선택하세요" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{project.name}</span>
-                      {(project as any).group_id && (
-                        <Badge variant="outline" className="text-xs">
-                          기업 프로젝트
-                        </Badge>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <List className="w-8 h-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold">WBS 관리</h1>
+            <p className="text-muted-foreground">프로젝트 작업 분할 구조(WBS)를 관리할 수 있습니다.</p>
           </div>
-          {selectedProject && (
-            <div className="text-sm text-gray-600">
-              <span className="font-medium">{selectedProject.name}</span>
-              {(selectedProject as any).group_id ? (
-                <span className="ml-2 text-blue-600">• 기업 프로젝트</span>
-              ) : (
-                <span className="ml-2 text-gray-500">• 개인 프로젝트</span>
-              )}
-            </div>
-          )}
         </div>
-      </div>
-
         {/* 뷰 모드 토글 */}
-        <div className="flex items-center border rounded-lg">
+        <div className="flex items-center border rounded-lg w-fit">
           <Button
             variant={viewMode === 'table' ? 'default' : 'ghost'}
             size="sm"
@@ -1793,6 +1856,17 @@ export default function WBSManagement() {
             </Button>
           </div>
           </div>
+
+      {/* 현재 프로젝트 */}
+      {activeProject && (
+        <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
+          <Target className="w-5 h-5 text-primary" />
+          <div>
+            <span className="text-sm text-muted-foreground">현재 프로젝트:</span>
+            <span className="ml-2 text-lg font-semibold">{activeProject.name}</span>
+          </div>
+        </div>
+      )}
 
       {/* 통계 정보 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1955,45 +2029,35 @@ export default function WBSManagement() {
               </div>
 
               {/* 간트차트 */}
-              <div className="overflow-x-auto overflow-y-visible">
+              <div className="overflow-x-auto overflow-y-visible border border-gray-200 rounded-lg bg-white shadow-sm scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                 <div 
-                  className="inline-block" 
+                  className="inline-block min-w-full" 
                   style={{ 
-                    width: `${64 + (months.length * 32)}rem`,
+                    width: `${Math.min(256 + (months.length * 200), 1200)}px`, // 256px (작업명) + 월별 200px, 최대 1200px
                     transform: `scale(${zoomLevel})`, 
                     transformOrigin: 'top left' 
                   }}
                 >
                   {/* 헤더 */}
                   <div className="flex border-b border-gray-200">
-                    <div className="w-64 p-3 font-medium bg-gray-50 border-r border-gray-200 flex-shrink-0">
+                    <div className="w-64 p-3 font-medium bg-gray-50 border-r border-gray-200 flex-shrink-0 min-w-[256px]">
                       작업명
                     </div>
                     <div className="flex-1 bg-gray-50 relative">
                       {/* 월별 헤더 */}
                       <div className="relative">
                         {months.map((month, index) => {
-                          const monthStart = new Date(month.year, month.month - 1, 1)
-                          const baseDate = new Date('2024-01-01')
-                          const monthStartDays = Math.floor((monthStart.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24))
-                          const monthPosition = (monthStartDays / 150) * 100
-                          
-                          // 다음 월의 시작 위치 계산 (마지막 월 제외)
-                          const nextMonthStart = index < months.length - 1 ? 
-                            new Date(months[index + 1].year, months[index + 1].month - 1, 1) :
-                            new Date(month.year, month.month, 1) // 현재 월의 다음 달 1일
-                          const nextMonthStartDays = Math.floor((nextMonthStart.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24))
-                          const nextMonthPosition = (nextMonthStartDays / 150) * 100
-                          
-                          const monthWidth = nextMonthPosition - monthPosition
+                          // 각 월의 너비를 균등하게 분배 (200px씩)
+                          const monthWidth = 200
+                          const monthPosition = index * monthWidth
                           
                           return (
                             <div
                               key={`${month.year}-${month.month}`}
-                              className="absolute top-0 p-2 text-center"
+                              className="absolute top-0 p-2 text-center border-r border-gray-200"
                               style={{ 
-                                left: `${monthPosition}%`,
-                                width: `${monthWidth}%`,
+                                left: `${monthPosition}px`,
+                                width: `${monthWidth}px`,
                                 height: '100%'
                               }}
                             >
@@ -2010,7 +2074,7 @@ export default function WBSManagement() {
                   {convertToGanttTasks(tasks).map((task) => (
                     <div key={task.id} className="flex border-b border-gray-200 hover:bg-gray-50 min-h-[32px]">
                       {/* 작업 정보 */}
-                      <div className="w-64 p-2 border-r border-gray-200 flex-shrink-0">
+                      <div className="w-64 p-2 border-r border-gray-200 flex-shrink-0 min-w-[256px]">
                         <div className="flex items-center">
                           {/* 들여쓰기 */}
                           <div style={{ paddingLeft: `${task.depth * 20}px` }} className="flex items-center relative z-10">
@@ -2074,7 +2138,7 @@ export default function WBSManagement() {
                           
                           {/* 작업 막대 */}
                           <div
-                            className="absolute top-0.5 h-5 rounded opacity-80 flex items-center justify-center border border-gray-500"
+                            className="absolute top-0.5 h-5 rounded opacity-80 flex items-center justify-start border border-gray-500"
                             style={{
                               left: calculateTaskPosition(task.startDate, task.endDate).left,
                               width: calculateTaskPosition(task.startDate, task.endDate).width,
@@ -2120,6 +2184,201 @@ export default function WBSManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* 담당자 선택 모달 */}
+      <Dialog open={assigneeModalOpen} onOpenChange={setAssigneeModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>담당자 관리</DialogTitle>
+            <DialogDescription>
+              작업의 담당자를 선택하세요.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* 프로젝트 기업 정보 표시 */}
+            {selectedProjectCompany ? (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-800">
+                    {selectedProjectCompany.name}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-800">
+                    개인 프로젝트
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {/* 검색 입력 */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="이름, 이메일, 역할로 검색..."
+                value={assigneeSearchTerm}
+                onChange={(e) => setAssigneeSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            {/* 구성원 목록 */}
+            <div className="max-h-60 overflow-y-auto space-y-2">
+              {filteredMembers.length > 0 ? (
+                filteredMembers.map((member) => {
+                  console.log('렌더링 중인 멤버:', member, 'role === Owner?', member.role === 'Owner')
+                  return (
+                    <div
+                      key={member.id}
+                      onClick={() => selectAssignee(member)}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                        <User className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm flex items-center gap-2">
+                          {member.name}
+                          {member.role === 'Owner' && (
+                            <Badge variant="secondary" className="text-xs">
+                              Owner
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">{member.email}</div>
+                        <div className="text-xs text-gray-400">{member.role}</div>
+                      </div>
+                    </div>
+                  )
+                })
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <User className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>검색 결과가 없습니다.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task 상세 모달 */}
+      <Dialog open={taskDetailModalOpen} onOpenChange={setTaskDetailModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>작업 상세 정보</DialogTitle>
+            <DialogDescription>
+              선택한 작업의 상세 정보를 확인할 수 있습니다.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedTaskDetail && (
+            <div className="space-y-6">
+              {/* 기본 정보 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">ID</label>
+                  <div className="text-sm font-mono bg-gray-100 px-3 py-2 rounded">
+                    {selectedTaskDetail.id}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">레벨</label>
+                  <div className="text-sm bg-gray-100 px-3 py-2 rounded">
+                    Level {selectedTaskDetail.level}
+                  </div>
+                </div>
+              </div>
+
+              {/* 작업명 */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-500">작업명</label>
+                <div className="text-lg font-medium bg-gray-100 px-3 py-2 rounded">
+                  {selectedTaskDetail.name}
+                </div>
+              </div>
+
+              {/* 진행률과 상태 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">진행률</label>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-32 bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full ${getProgressColor(selectedTaskDetail.progress)}`}
+                          style={{ width: `${selectedTaskDetail.progress}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-medium">{selectedTaskDetail.progress}%</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">상태</label>
+                  <div className="flex items-center gap-2">
+                    <Badge className={getStatusColor(selectedTaskDetail.status)}>
+                      {selectedTaskDetail.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* 날짜 정보 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">시작일</label>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm">{selectedTaskDetail.startDate}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">종료일</label>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm">{selectedTaskDetail.endDate}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 담당자 */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-500">담당자</label>
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm">{selectedTaskDetail.assignee}</span>
+                </div>
+              </div>
+
+              {/* 하위 작업이 있는 경우 */}
+              {selectedTaskDetail.children && selectedTaskDetail.children.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">하위 작업</label>
+                  <div className="space-y-1">
+                    {selectedTaskDetail.children.map((child) => (
+                      <div key={child.id} className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded">
+                        <span className="font-mono text-xs">{child.id}</span>
+                        <span>{child.name}</span>
+                        <Badge className={getStatusColor(child.status)} variant="outline">
+                          {child.status}
+                        </Badge>
+                        <span className="text-xs text-gray-500">{child.progress}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useLocation } from "react-router-dom"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -230,6 +231,7 @@ const Projects = () => {
   const { toast } = useToast()
   const { user, userProfile } = useAuth()
   const queryClient = useQueryClient()
+  const location = useLocation()
   const [searchTerm, setSearchTerm] = useState("")
   const [filter, setFilter] = useState("전체")
   const [userAuthority, setUserAuthority] = useState<string | null>(null)
@@ -352,6 +354,14 @@ const Projects = () => {
       loadUserPermissions()
     }
   }, [user])
+
+  // 페이지 이동 감지 - F5와 동일한 처리
+  useEffect(() => {
+    console.log('🔄 페이지 이동 감지:', location.pathname)
+    // 페이지 이동 시 데이터 새로고침
+    queryClient.invalidateQueries({ queryKey: ['projects'] })
+    queryClient.invalidateQueries({ queryKey: ['favorites'] })
+  }, [location.pathname, queryClient])
 
   const loadUserPermissions = async () => {
     try {

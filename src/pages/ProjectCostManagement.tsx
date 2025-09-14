@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react"
+import { useLocation } from "react-router-dom"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DollarSign, TrendingUp, Users, ShoppingCart, Plus, Download, Filter, Share2 } from "lucide-react"
+import { DollarSign, Users, ShoppingCart, Plus, Share2, Building, Calendar, Target } from "lucide-react"
 import { CostManagementShareModal } from "@/components/CostManagementShareModal"
 import { canAccessCostManagement } from "@/services/costManagementService"
 import { useAuth } from "@/hooks/useAuth"
@@ -16,66 +15,135 @@ type Project = Database['public']['Tables']['projects']['Row']
 
 export default function ProjectCostManagement() {
   const { user } = useAuth()
-  const [selectedProject, setSelectedProject] = useState<string>("")
+  const location = useLocation()
+  const [activeProject, setActiveProject] = useState<Project | null>(null)
   const [activeTab, setActiveTab] = useState<string>("profit-loss")
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [hasAccess, setHasAccess] = useState(false)
   const [isCheckingAccess, setIsCheckingAccess] = useState(true)
-  const [projects, setProjects] = useState<Project[]>([])
-  const [isLoadingProjects, setIsLoadingProjects] = useState(true)
+  const [isLoadingProject, setIsLoadingProject] = useState(true)
 
-  // 프로젝트 목록 로드
+  // 활성화된 프로젝트 로드
   useEffect(() => {
-    const loadProjects = async () => {
+    const loadActiveProject = async () => {
       if (!user) return
       
       try {
-        setIsLoadingProjects(true)
-        const { data, error } = await supabase
-          .from('projects')
-          .select('*')
-          .order('created_at', { ascending: false })
-
-        if (error) {
-          console.error('프로젝트 목록 로드 실패:', error)
-          return
-        }
-
-        setProjects(data || [])
+        setIsLoadingProject(true)
         
-        // 첫 번째 프로젝트를 자동 선택
-        if (data && data.length > 0) {
-          setSelectedProject(data[0].id)
+        // localStorage에서 활성화된 프로젝트 가져오기
+        const savedOpenProject = localStorage.getItem('openProject')
+        if (savedOpenProject) {
+          const project = JSON.parse(savedOpenProject)
+          setActiveProject(project)
+        } else {
+          // 활성화된 프로젝트가 없으면 첫 번째 프로젝트 로드
+          const { data, error } = await supabase
+            .from('projects')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(1)
+
+          if (error) {
+            console.error('프로젝트 로드 실패:', error)
+            return
+          }
+
+          if (data && data.length > 0) {
+            setActiveProject(data[0])
+          }
         }
       } catch (error) {
-        console.error('프로젝트 목록 로드 중 오류:', error)
+        console.error('프로젝트 로드 중 오류:', error)
       } finally {
-        setIsLoadingProjects(false)
+        setIsLoadingProject(false)
       }
     }
 
-    loadProjects()
+    loadActiveProject()
   }, [user])
 
-  // 접근 권한 확인
+  // 페이지 이동 감지 - F5와 동일한 처리
   useEffect(() => {
-    const checkAccess = async () => {
-      if (!user || !selectedProject) return
+    console.log('🔄 비용 관리 페이지 이동 감지:', location.pathname)
+    const loadActiveProject = async () => {
+      if (!user) return
       
       try {
+        setIsLoadingProject(true)
+        
+        // localStorage에서 활성화된 프로젝트 가져오기
+        const savedOpenProject = localStorage.getItem('openProject')
+        if (savedOpenProject) {
+          const project = JSON.parse(savedOpenProject)
+          setActiveProject(project)
+        } else {
+          // 활성화된 프로젝트가 없으면 첫 번째 프로젝트 로드
+          const { data, error } = await supabase
+            .from('projects')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(1)
+
+          if (error) {
+            console.error('프로젝트 로드 실패:', error)
+            return
+          }
+
+          if (data && data.length > 0) {
+            setActiveProject(data[0])
+          }
+        }
+      } catch (error) {
+        console.error('페이지 이동 시 프로젝트 로드 중 오류:', error)
+      } finally {
+        setIsLoadingProject(false)
+      }
+    }
+
+    loadActiveProject()
+  }, [location.pathname, user])
+
+  // 접근 권한 확인 (단순화된 버전)
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!user || !activeProject) {
+        console.log('사용자 또는 활성 프로젝트가 없음:', { user: !!user, activeProject: !!activeProject })
+        setIsCheckingAccess(false)
+        return
+      }
+      
+      try {
+        console.log('비용 관리 접근 권한 확인 시작:', { projectId: activeProject.id, userId: user.id })
         setIsCheckingAccess(true)
-        const access = await canAccessCostManagement(selectedProject)
-        setHasAccess(access)
+        
+        // 임시 해결책: 프로젝트 생성자만 접근 허용 (데이터베이스 쿼리 없이)
+        // localStorage에서 프로젝트 정보를 확인하여 생성자 여부 판단
+        const savedOpenProject = localStorage.getItem('openProject')
+        if (savedOpenProject) {
+          const project = JSON.parse(savedOpenProject)
+          if (project.created_by === user.id) {
+            console.log('✅ 프로젝트 생성자로 접근 허용 (localStorage 확인)')
+            setHasAccess(true)
+          } else {
+            console.log('❌ 프로젝트 생성자가 아님 - 접근 거부')
+            setHasAccess(false)
+          }
+        } else {
+          console.log('❌ 프로젝트 정보 없음 - 접근 거부')
+          setHasAccess(false)
+        }
       } catch (error) {
         console.error('접근 권한 확인 실패:', error)
         setHasAccess(false)
       } finally {
+        console.log('접근 권한 확인 완료')
         setIsCheckingAccess(false)
       }
     }
 
     checkAccess()
-  }, [user, selectedProject])
+  }, [user, activeProject])
 
 
   const profitLossData = {
@@ -122,7 +190,7 @@ export default function ProjectCostManagement() {
   }
 
   // 프로젝트 로딩 중
-  if (isLoadingProjects) {
+  if (isLoadingProject) {
     return (
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center h-64">
@@ -135,16 +203,16 @@ export default function ProjectCostManagement() {
     )
   }
 
-  // 프로젝트가 없는 경우
-  if (projects.length === 0) {
+  // 활성화된 프로젝트가 없는 경우
+  if (!activeProject) {
     return (
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <DollarSign className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">프로젝트가 없습니다</h2>
+            <h2 className="text-2xl font-bold mb-2">활성화된 프로젝트가 없습니다</h2>
             <p className="text-muted-foreground">
-              비용 관리를 위한 프로젝트를 먼저 생성해주세요.
+              비용 관리를 위해 프로젝트를 먼저 열어주세요.
             </p>
           </div>
         </div>
@@ -155,11 +223,17 @@ export default function ProjectCostManagement() {
   // 접근 권한 확인 중
   if (isCheckingAccess) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="p-6 space-y-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">접근 권한을 확인하는 중...</p>
+            <p className="text-muted-foreground mb-2">접근 권한을 확인하는 중...</p>
+            <p className="text-xs text-gray-500">
+              프로젝트: {activeProject?.name || '로딩 중...'}
+            </p>
+            <p className="text-xs text-gray-500">
+              사용자: {user?.id ? '인증됨' : '인증 대기 중...'}
+            </p>
           </div>
         </div>
       </div>
@@ -186,7 +260,8 @@ export default function ProjectCostManagement() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="p-6 space-y-6">
+      {/* 헤더 */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <DollarSign className="w-8 h-8 text-primary" />
@@ -201,42 +276,15 @@ export default function ProjectCostManagement() {
         </Button>
       </div>
 
-      {/* 프로젝트 선택 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>프로젝트 설정</CardTitle>
-          <CardDescription>비용을 관리할 프로젝트를 선택하세요.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">프로젝트:</span>
-              <Select value={selectedProject} onValueChange={setSelectedProject}>
-                <SelectTrigger className="w-64">
-                  <SelectValue placeholder="프로젝트 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      {/* 현재 프로젝트 */}
+      <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
+        <Target className="w-5 h-5 text-primary" />
+        <div>
+          <span className="text-sm text-muted-foreground">현재 프로젝트:</span>
+          <span className="ml-2 text-lg font-semibold">{activeProject.name}</span>
+        </div>
+      </div>
 
-            <Button variant="outline">
-              <Filter className="w-4 h-4 mr-2" />
-              필터
-            </Button>
-
-            <Button variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              내보내기
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* 탭 메뉴 */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -461,8 +509,8 @@ export default function ProjectCostManagement() {
       <CostManagementShareModal
         open={isShareModalOpen}
         onOpenChange={setIsShareModalOpen}
-        projectId={selectedProject}
-        projectName={projects.find(p => p.id === selectedProject)?.name || '선택된 프로젝트'}
+        projectId={activeProject.id}
+        projectName={activeProject.name}
       />
     </div>
   )

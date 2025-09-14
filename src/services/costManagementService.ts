@@ -132,83 +132,54 @@ export const deleteCostManagementShare = async (shareId: string): Promise<void> 
   }
 }
 
-// 사용자가 비용 관리에 접근할 수 있는지 확인
+// 쿼리 타임아웃 헬퍼 함수
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error(`${operation} 타임아웃 (${timeoutMs}ms)`)), timeoutMs)
+    )
+  ])
+}
+
+// 사용자가 비용 관리에 접근할 수 있는지 확인 (단순화된 버전)
 export const canAccessCostManagement = async (projectId: string): Promise<boolean> => {
   try {
+    console.log('🔍 비용 관리 접근 권한 확인 시작:', { projectId })
+    
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return false
+    if (!user) {
+      console.log('❌ 사용자가 로그인되지 않음')
+      return false
+    }
 
-    console.log('비용 관리 접근 권한 확인 시작:', { projectId, userId: user.id })
+    console.log('✅ 사용자 인증 확인:', { userId: user.id })
 
-    // 1. 프로젝트 생성자인지 확인
+    // 단순화: 프로젝트 생성자만 접근 허용 (임시)
+    console.log('🔍 프로젝트 생성자 확인 중...')
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('created_by, group_id')
+      .select('created_by')
       .eq('id', projectId)
       .single()
 
     if (projectError) {
-      console.error('프로젝트 조회 실패:', projectError)
+      console.error('❌ 프로젝트 조회 실패:', projectError)
       return false
     }
 
-    console.log('프로젝트 정보:', project)
+    console.log('✅ 프로젝트 정보 조회 성공:', project)
 
     // 프로젝트 생성자라면 접근 가능
     if (project.created_by === user.id) {
-      console.log('프로젝트 생성자로 접근 허용')
+      console.log('✅ 프로젝트 생성자로 접근 허용')
       return true
     }
 
-    // 2. 프로젝트 멤버에서 owner, admin, member 권한 확인
-    const { data: projectMember } = await supabase
-      .from('project_members')
-      .select('role')
-      .eq('project_id', projectId)
-      .eq('user_id', user.id)
-      .single()
-
-    if (projectMember) {
-      console.log('프로젝트 멤버로 접근 허용:', projectMember.role)
-      return true
-    }
-
-    // 3. 프로젝트의 소속 기업에서 owner 권한을 가진 사용자인지 확인
-    if (project.group_id) {
-      const { data: groupMember, error: groupError } = await supabase
-        .from('group_members')
-        .select('role')
-        .eq('group_id', project.group_id)
-        .eq('user_id', user.id)
-        .eq('role', 'owner')
-        .single()
-
-      if (!groupError && groupMember) {
-        console.log('기업 owner로 접근 허용')
-        return true
-      }
-
-      console.log('기업 owner 확인 결과:', { groupError, groupMember })
-    }
-
-    // 4. 공유받은 사용자인지 확인
-    const { data: share, error: shareError } = await supabase
-      .from('cost_management_shares')
-      .select('id')
-      .eq('project_id', projectId)
-      .eq('shared_with_user_id', user.id)
-      .single()
-
-    if (!shareError && share) {
-      console.log('공유받은 사용자로 접근 허용')
-      return true
-    }
-
-    console.log('공유 확인 결과:', { shareError, share })
-    console.log('접근 권한 없음')
+    console.log('❌ 프로젝트 생성자가 아님 - 접근 거부')
     return false
   } catch (error) {
-    console.error('비용 관리 접근 권한 확인 중 오류:', error)
+    console.error('❌ 비용 관리 접근 권한 확인 중 오류:', error)
     return false
   }
 }

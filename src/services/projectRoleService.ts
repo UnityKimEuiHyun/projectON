@@ -197,33 +197,36 @@ export const canManageProjectMembers = async (projectId: string): Promise<boolea
   }
 }
 
-// 사용자가 비용 관리 권한을 변경할 수 있는지 확인
+// 사용자가 비용 관리 권한을 변경할 수 있는지 확인 (단순화된 버전)
 export const canManageCostPermissions = async (projectId: string): Promise<boolean> => {
   try {
+    console.log('🔍 비용 관리 권한 관리 권한 확인 시작:', { projectId })
+    
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return false
+    if (!user) {
+      console.log('❌ 사용자가 로그인되지 않음')
+      return false
+    }
 
-    // 1. 프로젝트 생성자인지 확인
-    const { data: project } = await supabase
-      .from('projects')
-      .select('created_by')
-      .eq('id', projectId)
-      .single()
+    console.log('✅ 사용자 인증 확인:', { userId: user.id })
 
-    if (project?.created_by === user.id) return true
-
-    // 2. 프로젝트 멤버에서 owner 또는 admin인지 확인
-    const { data: member } = await supabase
-      .from('project_members')
-      .select('role')
-      .eq('project_id', projectId)
-      .eq('user_id', user.id)
-      .in('role', ['owner', 'admin'])
-      .single()
-
-    return !!member
+    // 단순화: 프로젝트 생성자만 권한 관리 허용 (localStorage 확인)
+    const savedOpenProject = localStorage.getItem('openProject')
+    if (savedOpenProject) {
+      const project = JSON.parse(savedOpenProject)
+      if (project.created_by === user.id) {
+        console.log('✅ 프로젝트 생성자로 권한 관리 허용 (localStorage 확인)')
+        return true
+      } else {
+        console.log('❌ 프로젝트 생성자가 아님 - 권한 관리 거부')
+        return false
+      }
+    } else {
+      console.log('❌ 프로젝트 정보 없음 - 권한 관리 거부')
+      return false
+    }
   } catch (error) {
-    console.error('비용 관리 권한 확인 중 오류:', error)
+    console.error('❌ 비용 관리 권한 확인 중 오류:', error)
     return false
   }
 }

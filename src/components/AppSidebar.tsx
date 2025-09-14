@@ -20,7 +20,9 @@ import {
   ChevronRight,
   CalendarDays,
   GanttChart,
-  MapPin
+  MapPin,
+  List,
+  UserCheck
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
@@ -66,7 +68,8 @@ const projectManagementItems = [
 const getOpenProjectItems = (projectName: string, userRole: string | null) => {
   const allItems = [
     { title: "프로젝트 요약", url: "/projects/summary", icon: BarChart3 },
-    { title: "WBS 관리", url: "/projects/wbs", icon: BarChart3 },
+    { title: "WBS 관리", url: "/projects/wbs", icon: List },
+    { title: "리소스 관리", url: "/projects/resource", icon: UserCheck },
     { title: "비용 관리", url: "/projects/cost", icon: DollarSign, requiresAdmin: true },
     { title: "자산 관리", url: "/projects/expense", icon: ShoppingCart },
     { title: "일일 보고서", url: "/projects/daily-report", icon: FileText },
@@ -172,6 +175,13 @@ export function AppSidebar() {
     if (path === "/") {
       return currentPath === "/"
     }
+    
+    // 전체 프로젝트 목록은 정확히 /projects일 때만 활성화
+    if (path === "/projects") {
+      return currentPath === "/projects"
+    }
+    
+    // 나머지는 startsWith 사용
     return currentPath.startsWith(path)
   }
 

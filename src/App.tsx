@@ -24,6 +24,7 @@ import DailyReport from "./pages/DailyReport";
 import WeeklyReport from "./pages/WeeklyReport";
 import ProjectLog from "./pages/ProjectLog";
 import Meetings from "./pages/Meetings";
+import ResourceManagement from "./pages/ResourceManagement";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient({
@@ -69,6 +70,13 @@ const App = () => (
                 <ProtectedRoute>
                   <Layout>
                     <WBSManagement />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              <Route path="/projects/resource" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ResourceManagement />
                   </Layout>
                 </ProtectedRoute>
               } />
