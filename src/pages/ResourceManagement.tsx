@@ -393,23 +393,23 @@ const ResourceManagement = () => {
                 <div className="text-xl font-bold text-green-600">
                   {resourceAllocations.filter(r => r.status === 'active').length}
                 </div>
-                <div className="text-sm text-muted-foreground">진행중</div>
+                <div className="text-sm text-muted-foreground">현재 투입</div>
               </div>
               <div className="flex items-center gap-2">
                 <div className="text-xl font-bold text-yellow-600">
                   {resourceAllocations.filter(r => r.status === 'planned').length}
                 </div>
-                <div className="text-sm text-muted-foreground">계획됨</div>
+                <div className="text-sm text-muted-foreground">투입 예정</div>
               </div>
               <div className="flex items-center gap-2">
                 <div className="text-xl font-bold text-gray-600">
                   {resourceAllocations.filter(r => r.status === 'completed').length}
                 </div>
-                <div className="text-sm text-muted-foreground">완료</div>
+                <div className="text-sm text-muted-foreground">철수 완료</div>
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
-              리소스 현황 요약
+              현재 투입 인원 현황
             </div>
           </div>
         </CardContent>
@@ -431,9 +431,7 @@ const ResourceManagement = () => {
                   <th className="text-left p-3 font-semibold">상주 유형</th>
                   <th className="text-left p-3 font-semibold">투입일</th>
                   <th className="text-left p-3 font-semibold">철수일</th>
-                  <th className="text-left p-3 font-semibold">상태</th>
                   <th className="text-left p-3 font-semibold">주요 작업</th>
-                  <th className="text-left p-3 font-semibold">주요 산출물</th>
                   <th className="text-left p-3 font-semibold">액션</th>
                 </tr>
               </thead>
@@ -463,11 +461,6 @@ const ResourceManagement = () => {
                       {allocation.endDate}
                     </td>
                     <td className="p-3">
-                      <Badge className={getStatusColor(allocation.status)}>
-                        {getStatusText(allocation.status)}
-                      </Badge>
-                    </td>
-                    <td className="p-3">
                       <div className="space-y-1">
                         {allocation.tasks.slice(0, 2).map((task) => (
                           <div key={task.id} className="text-xs text-muted-foreground">
@@ -482,26 +475,12 @@ const ResourceManagement = () => {
                       </div>
                     </td>
                     <td className="p-3">
-                      <div className="space-y-1">
-                        {allocation.outputs.slice(0, 2).map((output) => (
-                          <div key={output.id} className="text-xs text-muted-foreground">
-                            • {output.title}
-                          </div>
-                        ))}
-                        {allocation.outputs.length > 2 && (
-                          <div className="text-xs text-blue-600">
-                            +{allocation.outputs.length - 2}개 더
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-3">
                       <div className="flex items-center gap-1">
-                        <Button variant="outline" size="sm">
-                          <Edit className="w-3 h-3" />
+                        <Button variant="outline" size="sm" className="text-blue-600 hover:text-blue-700">
+                          투입
                         </Button>
                         <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                          <Trash2 className="w-3 h-3" />
+                          철수
                         </Button>
                       </div>
                     </td>

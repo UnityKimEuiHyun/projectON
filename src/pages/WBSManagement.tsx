@@ -2134,11 +2134,11 @@ export default function WBSManagement() {
 
                       {/* 타임라인 바 - 최하위 항목만 (하위 작업이 없는 항목) */}
                       {!task.hasChildren ? (
-                        <div className="flex-1 relative h-0 bg-gray-50 overflow-visible">
+                        <div className="flex-1 relative bg-gray-50 overflow-visible">
                           
                           {/* 작업 막대 */}
                           <div
-                            className="absolute top-0.5 h-5 rounded opacity-80 flex items-center justify-start border border-gray-500"
+                            className="absolute top-1/2 transform -translate-y-1/2 h-5 rounded opacity-80 flex items-center justify-start border border-gray-500"
                             style={{
                               left: calculateTaskPosition(task.startDate, task.endDate).left,
                               width: calculateTaskPosition(task.startDate, task.endDate).width,
@@ -2161,7 +2161,7 @@ export default function WBSManagement() {
                         </div>
                       ) : (
                         // 최하위가 아닌 경우 빈 공간
-                        <div className="flex-1 h-0 relative">
+                        <div className="flex-1 relative">
                         </div>
                       )}
                     </div>
