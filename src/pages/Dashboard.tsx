@@ -24,7 +24,13 @@ import { FavoriteService } from "@/services/favoriteService"
 import { useAuth } from "@/hooks/useAuth"
 import type { Database } from '@/integrations/supabase/types'
 
-type Project = Database['public']['Tables']['projects']['Row']
+type Project = Database['public']['Tables']['projects']['Row'] & {
+  groups?: {
+    id: string
+    name: string
+    description: string | null
+  } | null
+}
 
 interface PersonalTask {
   id: string
@@ -46,10 +52,24 @@ interface Mention {
   isRead: boolean
 }
 
+interface DeploymentRequest {
+  id: string
+  memberId: string
+  memberName: string
+  projectName: string
+  requestDate: string
+  status: 'pending' | 'accepted' | 'rejected'
+  workType: 'full-time' | 'part-time' | 'remote'
+  startDate: string
+  endDate: string
+  requestType: 'deployment' | 'withdrawal'
+}
+
 const Dashboard = () => {
   const { user } = useAuth()
   const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>([])
   const [mockMentions, setMockMentions] = useState<Mention[]>([])
+  const [deploymentRequests, setDeploymentRequests] = useState<DeploymentRequest[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
 
   const handleProjectSelect = (project: Project) => {
@@ -141,7 +161,87 @@ const Dashboard = () => {
   useEffect(() => {
     loadPersonalTasks()
     loadMentions()
+    loadDeploymentRequests()
   }, [])
+
+  const loadDeploymentRequests = () => {
+    // 투입/철수 요청 목업 데이터
+    setDeploymentRequests([
+      {
+        id: '1',
+        memberId: 'member-1',
+        memberName: '김의현',
+        projectName: 'ProjectON',
+        requestDate: '2024-01-10',
+        status: 'pending',
+        workType: 'full-time',
+        startDate: '2024-01-15',
+        endDate: '2024-03-15',
+        requestType: 'deployment'
+      },
+      {
+        id: '2',
+        memberId: 'member-2',
+        memberName: '이민수',
+        projectName: 'ProjectON',
+        requestDate: '2024-01-11',
+        status: 'pending',
+        workType: 'part-time',
+        startDate: '2024-01-20',
+        endDate: '2024-02-20',
+        requestType: 'withdrawal'
+      },
+      {
+        id: '3',
+        memberId: 'member-3',
+        memberName: '박지영',
+        projectName: 'ProjectON',
+        requestDate: '2024-01-09',
+        status: 'accepted',
+        workType: 'remote',
+        startDate: '2024-01-12',
+        endDate: '2024-04-12',
+        requestType: 'deployment'
+      }
+    ])
+  }
+
+  // 투입/철수 요청 수락/거부 처리
+  const handleDeploymentRequest = (requestId: string, action: 'accepted' | 'rejected') => {
+    setDeploymentRequests(prev => 
+      prev.map(request => 
+        request.id === requestId 
+          ? { ...request, status: action }
+          : request
+      )
+    )
+    
+    const request = deploymentRequests.find(r => r.id === requestId)
+    if (request) {
+      const requestTypeText = request.requestType === 'deployment' ? '투입' : '철수'
+      console.log(`${requestTypeText} 요청 ${action === 'accepted' ? '수락' : '거부'}: ${request.memberName}`)
+    }
+  }
+
+  // 투입 요청 상태 색상 반환
+  const getDeploymentRequestStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800'
+      case 'accepted': return 'bg-green-100 text-green-800'
+      case 'rejected': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  // 투입 요청 상태 텍스트 반환
+  const getDeploymentRequestStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return '대기중'
+      case 'accepted': return '수락됨'
+      case 'rejected': return '거부됨'
+      default: return status
+    }
+  }
 
 
   // 사이드바의 열린 프로젝트 상태와 동기화
@@ -531,6 +631,7 @@ const Dashboard = () => {
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">프로젝트명</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">소속</th>
                   <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">설명</th>
                   <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">상태</th>
                   <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">진행률</th>
@@ -545,7 +646,7 @@ const Dashboard = () => {
               <tbody>
                 {myProjects.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={11} className="text-center py-8 text-muted-foreground">
                       참여 중인 프로젝트가 없습니다
                     </td>
                   </tr>
@@ -580,6 +681,11 @@ const Dashboard = () => {
                              </div>
                            </Button>
                          </td>
+                        <td className="py-3 px-4">
+                          <div className="text-sm font-medium">
+                            {project.groups?.name || '-'}
+                          </div>
+                        </td>
                         <td className="py-3 px-4">
                           <div className="text-sm text-muted-foreground max-w-xs truncate">
                             {project.description}
@@ -727,6 +833,87 @@ const Dashboard = () => {
       {/* 알림 및 소통 섹션 */}
       <div className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* 투입/철수 요청 알림 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5 text-green-500" />
+                투입/철수 요청 알림
+              </CardTitle>
+              <CardDescription>프로젝트 투입/철수 요청 및 승인 관리</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {deploymentRequests.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    투입/철수 요청이 없습니다
+                  </p>
+                ) : (
+                  deploymentRequests.map((request) => (
+                    <div 
+                      key={request.id} 
+                      className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50"
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        request.requestType === 'deployment' ? 'bg-green-100' : 'bg-red-100'
+                      }`}>
+                        <span className={`text-xs font-medium ${
+                          request.requestType === 'deployment' ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {request.memberName.charAt(0)}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium">{request.memberName}</span>
+                          <Badge 
+                            className={getDeploymentRequestStatusColor(request.status)}
+                            variant="outline"
+                          >
+                            {getDeploymentRequestStatusText(request.status)}
+                          </Badge>
+                          <Badge 
+                            className={request.requestType === 'deployment' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
+                            variant="outline"
+                          >
+                            {request.requestType === 'deployment' ? '투입' : '철수'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {request.projectName} 프로젝트 {request.requestType === 'deployment' ? '투입' : '철수'} 요청
+                        </p>
+                        <div className="text-xs text-muted-foreground mb-2">
+                          {request.workType === 'full-time' ? '상주' : 
+                           request.workType === 'part-time' ? '시간제' : '비상주'} • 
+                          {request.startDate} ~ {request.endDate}
+                        </div>
+                        {request.status === 'pending' && (
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              className="text-xs h-7"
+                              onClick={() => handleDeploymentRequest(request.id, 'accepted')}
+                            >
+                              수락
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="text-xs h-7"
+                              onClick={() => handleDeploymentRequest(request.id, 'rejected')}
+                            >
+                              거부
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* @ 호출된 메시지 */}
         <Card>
           <CardHeader>

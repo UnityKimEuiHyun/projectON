@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useMemo } from "react"
 import { useLocation } from "react-router-dom"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { BarChart3, Plus, Edit, Trash2, ChevronDown, ChevronRight, Calendar, User, Table, GanttChart, Filter, Download, Search, Minus, Plus as PlusIcon, UserPlus, Building2, Workflow, Target, FolderOpen, List } from "lucide-react"
+import TaskDetailModal, { WBSTask as TaskDetailWBSTask } from "@/components/TaskDetailModal"
+import { BarChart3, Plus, Edit, Trash2, ChevronDown, ChevronRight, Calendar, User, Table, GanttChart, Filter, Download, Search, Minus, Plus as PlusIcon, UserPlus, Building2, Workflow, Target, FolderOpen, List, Check, Upload, File, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getCompanyMembers, getUserCompanies, type CompanyMember } from "@/services/companyService"
 import { ProjectService } from "@/services/projectService"
@@ -51,9 +52,22 @@ interface WBSTask {
   startDate: string
   endDate: string
   assignee: string
+  assigneeId?: string
   status: string
   progress: number
+  description?: string
+  attachments?: AttachmentFile[]
+  deliverables?: AttachmentFile[] // 최종 산출물
   children?: WBSTask[]
+}
+
+interface AttachmentFile {
+  id: string
+  name: string
+  size: number
+  type: string
+  url?: string
+  uploadedAt: string
 }
 
 export default function WBSManagement() {
@@ -65,32 +79,32 @@ export default function WBSManagement() {
     // Lv1 작업의 ID를 추출 (예: "1-1-1" -> "1")
     const lv1Id = taskId.split('-')[0]
     
-    // Lv1별 테마색 정의
+    // Lv1별 테마색 정의 (더 진한 색상으로 변경)
     const themeColors = {
       '1': { // 프로젝트 기획
         base: '#3b82f6', // blue-500
-        light: '#dbeafe', // blue-100
-        lighter: '#eff6ff' // blue-50
+        light: '#93c5fd', // blue-300 (더 진하게)
+        lighter: '#dbeafe' // blue-100 (더 진하게)
       },
       '2': { // 디자인
         base: '#10b981', // emerald-500
-        light: '#d1fae5', // emerald-100
-        lighter: '#ecfdf5' // emerald-50
+        light: '#6ee7b7', // emerald-300 (더 진하게)
+        lighter: '#a7f3d0' // emerald-200 (더 진하게)
       },
       '3': { // 개발
         base: '#f59e0b', // amber-500
-        light: '#fef3c7', // amber-100
-        lighter: '#fffbeb' // amber-50
+        light: '#fcd34d', // amber-300 (더 진하게)
+        lighter: '#fde68a' // amber-200 (더 진하게)
       },
       '4': { // 테스트
         base: '#ef4444', // red-500
-        light: '#fecaca', // red-100
-        lighter: '#fef2f2' // red-50
+        light: '#fca5a5', // red-300 (더 진하게)
+        lighter: '#fecaca' // red-200 (더 진하게)
       },
       '5': { // 배포
         base: '#8b5cf6', // violet-500
-        light: '#e9d5ff', // violet-100
-        lighter: '#f5f3ff' // violet-50
+        light: '#c4b5fd', // violet-300 (더 진하게)
+        lighter: '#ddd6fe' // violet-200 (더 진하게)
       }
     }
     
@@ -176,7 +190,7 @@ export default function WBSManagement() {
   const wbsTasks: WBSTask[] = [
     {
       id: "1",
-      name: "1. 프로젝트 기획",
+      name: "프로젝트 기획",
       level: 1,
       startDate: "2024-01-01",
       endDate: "2024-01-31",
@@ -186,7 +200,7 @@ export default function WBSManagement() {
       children: [
         {
           id: "1-1",
-          name: "1.1 요구사항 분석",
+          name: "요구사항 분석",
           level: 2,
           startDate: "2024-01-01",
           endDate: "2024-01-15",
@@ -196,7 +210,7 @@ export default function WBSManagement() {
           children: [
             {
               id: "1-1-1",
-              name: "1.1.1 사용자 인터뷰",
+              name: "사용자 인터뷰",
               level: 3,
               startDate: "2024-01-01",
               endDate: "2024-01-05",
@@ -206,7 +220,7 @@ export default function WBSManagement() {
             },
             {
               id: "1-1-2",
-              name: "1.1.2 요구사항 정리",
+              name: "요구사항 정리",
               level: 3,
               startDate: "2024-01-06",
               endDate: "2024-01-10",
@@ -216,7 +230,7 @@ export default function WBSManagement() {
             },
             {
               id: "1-1-3",
-              name: "1.1.3 요구사항 검토",
+              name: "요구사항 검토",
               level: 3,
               startDate: "2024-01-11",
               endDate: "2024-01-15",
@@ -228,7 +242,7 @@ export default function WBSManagement() {
         },
         {
           id: "1-2",
-          name: "1.2 프로젝트 계획 수립",
+          name: "프로젝트 계획 수립",
           level: 2,
           startDate: "2024-01-16",
           endDate: "2024-01-31",
@@ -238,7 +252,7 @@ export default function WBSManagement() {
           children: [
             {
               id: "1-2-1",
-              name: "1.2.1 WBS 작성",
+              name: "WBS 작성",
               level: 3,
               startDate: "2024-01-16",
               endDate: "2024-01-20",
@@ -248,7 +262,7 @@ export default function WBSManagement() {
             },
             {
               id: "1-2-2",
-              name: "1.2.2 일정 계획",
+              name: "일정 계획",
               level: 3,
               startDate: "2024-01-21",
               endDate: "2024-01-25",
@@ -258,7 +272,7 @@ export default function WBSManagement() {
             },
             {
               id: "1-2-3",
-              name: "1.2.3 리소스 계획",
+              name: "리소스 계획",
               level: 3,
               startDate: "2024-01-26",
           endDate: "2024-01-31",
@@ -272,7 +286,7 @@ export default function WBSManagement() {
     },
     {
       id: "2",
-      name: "2. 디자인",
+      name: "디자인",
       level: 1,
       startDate: "2024-02-01",
       endDate: "2024-02-28",
@@ -282,7 +296,7 @@ export default function WBSManagement() {
       children: [
         {
           id: "2-1",
-          name: "2.1 UI/UX 디자인",
+          name: "UI/UX 디자인",
           level: 2,
           startDate: "2024-02-01",
           endDate: "2024-02-15",
@@ -292,7 +306,7 @@ export default function WBSManagement() {
           children: [
             {
               id: "2-1-1",
-              name: "2.1.1 와이어프레임",
+              name: "와이어프레임",
               level: 3,
               startDate: "2024-02-01",
               endDate: "2024-02-05",
@@ -302,7 +316,7 @@ export default function WBSManagement() {
             },
             {
               id: "2-1-2",
-              name: "2.1.2 프로토타입",
+              name: "프로토타입",
               level: 3,
               startDate: "2024-02-06",
               endDate: "2024-02-10",
@@ -312,7 +326,7 @@ export default function WBSManagement() {
             },
             {
               id: "2-1-3",
-              name: "2.1.3 디자인 시스템",
+              name: "디자인 시스템",
               level: 3,
               startDate: "2024-02-11",
               endDate: "2024-02-15",
@@ -324,7 +338,7 @@ export default function WBSManagement() {
         },
         {
           id: "2-2",
-          name: "2.2 그래픽 디자인",
+          name: "그래픽 디자인",
           level: 2,
           startDate: "2024-02-16",
           endDate: "2024-02-28",
@@ -334,7 +348,7 @@ export default function WBSManagement() {
           children: [
             {
               id: "2-2-1",
-              name: "2.2.1 로고 디자인",
+              name: "로고 디자인",
               level: 3,
               startDate: "2024-02-16",
               endDate: "2024-02-20",
@@ -344,7 +358,7 @@ export default function WBSManagement() {
             },
             {
               id: "2-2-2",
-              name: "2.2.2 아이콘 디자인",
+              name: "아이콘 디자인",
               level: 3,
               startDate: "2024-02-21",
               endDate: "2024-02-25",
@@ -354,7 +368,7 @@ export default function WBSManagement() {
             },
             {
               id: "2-2-3",
-              name: "2.2.3 일러스트레이션",
+              name: "일러스트레이션",
               level: 3,
               startDate: "2024-02-26",
               endDate: "2024-02-28",
@@ -366,7 +380,7 @@ export default function WBSManagement() {
         },
         {
           id: "2-3",
-          name: "2.3 프로토타입 제작",
+          name: "프로토타입 제작",
           level: 2,
           startDate: "2024-02-16",
           endDate: "2024-02-28",
@@ -378,7 +392,7 @@ export default function WBSManagement() {
     },
     {
       id: "3",
-      name: "3. 개발",
+      name: "개발",
       level: 1,
       startDate: "2024-03-01",
       endDate: "2024-05-31",
@@ -388,7 +402,7 @@ export default function WBSManagement() {
       children: [
         {
           id: "3-1",
-          name: "3.1 프론트엔드 개발",
+          name: "프론트엔드 개발",
           level: 2,
           startDate: "2024-03-01",
           endDate: "2024-04-30",
@@ -398,7 +412,7 @@ export default function WBSManagement() {
         },
         {
           id: "3-2",
-          name: "3.2 백엔드 개발",
+          name: "백엔드 개발",
           level: 2,
           startDate: "2024-03-15",
           endDate: "2024-05-15",
@@ -422,9 +436,18 @@ export default function WBSManagement() {
   const [selectedTaskId, setSelectedTaskId] = useState<string>("")
   const [assigneeSearchTerm, setAssigneeSearchTerm] = useState("")
   
+  // 최종 산출물 모달 상태
+  const [deliverableModalOpen, setDeliverableModalOpen] = useState(false)
+  const [selectedDeliverableTaskId, setSelectedDeliverableTaskId] = useState<string>("")
+  const [isDeliverableDragOver, setIsDeliverableDragOver] = useState(false)
+  
   // Task 상세 모달 상태
   const [taskDetailModalOpen, setTaskDetailModalOpen] = useState(false)
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<WBSTask | null>(null)
+  const [editingTask, setEditingTask] = useState<WBSTask | null>(null)
+  const [editingField, setEditingField] = useState<string | null>(null)
+  const [taskAssigneeSearchTerm, setTaskAssigneeSearchTerm] = useState("")
+  const [isDragOver, setIsDragOver] = useState(false)
   
   // 기업 멤버 상태
   const [companyMembers, setCompanyMembers] = useState<CompanyMember[]>([])
@@ -729,6 +752,96 @@ export default function WBSManagement() {
     })
   }
 
+  // 최종 산출물 모달 열기
+  const openDeliverableModal = (taskId: string) => {
+    setSelectedDeliverableTaskId(taskId)
+    setDeliverableModalOpen(true)
+  }
+
+  // 최종 산출물 업로드 처리
+  const handleDeliverableUpload = (files: FileList) => {
+    const taskId = selectedDeliverableTaskId
+    const newDeliverables: AttachmentFile[] = Array.from(files).map((file, index) => ({
+      id: `${taskId}-deliverable-${Date.now()}-${index}`,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      url: URL.createObjectURL(file),
+      uploadedAt: new Date().toISOString()
+    }))
+
+    const updateTaskInArray = (taskList: WBSTask[]): WBSTask[] => {
+      return taskList.map(task => {
+        if (task.id === taskId) {
+          return {
+            ...task,
+            deliverables: [...(task.deliverables || []), ...newDeliverables]
+          }
+        }
+        if (task.children) {
+          return {
+            ...task,
+            children: updateTaskInArray(task.children)
+          }
+        }
+        return task
+      })
+    }
+
+    setTasks(updateTaskInArray(tasks))
+    toast({
+      title: "산출물 업로드 완료",
+      description: `${files.length}개의 파일이 업로드되었습니다.`,
+    })
+  }
+
+  // 최종 산출물 삭제
+  const removeDeliverable = (taskId: string, deliverableId: string) => {
+    const updateTaskInArray = (taskList: WBSTask[]): WBSTask[] => {
+      return taskList.map(task => {
+        if (task.id === taskId) {
+          return {
+            ...task,
+            deliverables: task.deliverables?.filter(d => d.id !== deliverableId) || []
+          }
+        }
+        if (task.children) {
+          return {
+            ...task,
+            children: updateTaskInArray(task.children)
+          }
+        }
+        return task
+      })
+    }
+
+    setTasks(updateTaskInArray(tasks))
+    toast({
+      title: "산출물 삭제 완료",
+      description: "파일이 삭제되었습니다.",
+    })
+  }
+
+  // 최종 산출물 다운로드
+  const downloadDeliverable = (deliverable: AttachmentFile) => {
+    const link = document.createElement('a')
+    link.href = deliverable.url || ''
+    link.download = deliverable.name
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  // 모든 최종 산출물 다운로드
+  const downloadAllDeliverables = (taskId: string) => {
+    const task = findTaskById(tasks, taskId)
+    if (task?.deliverables) {
+      task.deliverables.forEach(deliverable => {
+        downloadDeliverable(deliverable)
+      })
+    }
+  }
+
   // 검색된 구성원 필터링
   const filteredMembers = React.useMemo(() => 
     teamMembers.filter(member =>
@@ -738,10 +851,261 @@ export default function WBSManagement() {
     ), [teamMembers, assigneeSearchTerm]
   )
 
+  // 계층 구조에서 작업을 찾는 함수
+  const findTaskById = (tasks: WBSTask[], taskId: string): WBSTask | null => {
+    for (const task of tasks) {
+      if (task.id === taskId) {
+        return task
+      }
+      if (task.children) {
+        const found = findTaskById(task.children, taskId)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
   // Task 상세 모달 열기
   const openTaskDetailModal = (task: WBSTask) => {
     setSelectedTaskDetail(task)
+    
+    // assigneeId가 없으면 기존 assignee 이름으로 찾아서 설정
+    let taskWithAssigneeId = { ...task }
+    if (!task.assigneeId && task.assignee && companyMembers.length > 0) {
+      const matchingMember = companyMembers.find(member => member.display_name === task.assignee)
+      if (matchingMember) {
+        taskWithAssigneeId.assigneeId = matchingMember.id
+      }
+    }
+    
+    setEditingTask(taskWithAssigneeId)
+    setEditingField(null)
     setTaskDetailModalOpen(true)
+  }
+
+  // 필드 편집 시작
+  const startEditingField = (field: string) => {
+    setEditingField(field)
+    // 담당자 편집 시 검색어 초기화
+    if (field === 'assignee') {
+      setTaskAssigneeSearchTerm("")
+    }
+  }
+
+  // 필드 편집 취소
+  const cancelEditingField = () => {
+    setEditingField(null)
+    // 원본 데이터로 복원
+    if (selectedTaskDetail) {
+      setEditingTask({ ...selectedTaskDetail })
+    }
+  }
+
+  // 작업 정보 업데이트
+  const updateTaskField = (field: keyof WBSTask, value: any) => {
+    if (editingTask) {
+      setEditingTask({ ...editingTask, [field]: value })
+    }
+  }
+
+  // 필드 저장
+  const saveField = (field: string) => {
+    setEditingField(null)
+    // 개별 필드 저장은 즉시 반영
+    if (editingTask && selectedTaskDetail) {
+      setSelectedTaskDetail({ ...editingTask })
+    }
+  }
+
+  // 전체 작업 저장
+  const saveTask = () => {
+    if (!editingTask || !selectedTaskDetail) return
+
+    // tasks 배열에서 해당 작업 찾아서 업데이트
+    const updateTaskInArray = (taskList: WBSTask[]): WBSTask[] => {
+      return taskList.map(task => {
+        if (task.id === editingTask.id) {
+          return { ...editingTask }
+        }
+        if (task.children) {
+          return { ...task, children: updateTaskInArray(task.children) }
+        }
+        return task
+      })
+    }
+
+    setTasks(updateTaskInArray(tasks))
+    setSelectedTaskDetail(editingTask)
+    setEditingField(null)
+    
+    toast({
+      title: "작업 정보가 저장되었습니다",
+      description: `${editingTask.name}의 정보가 성공적으로 업데이트되었습니다.`
+    })
+  }
+
+  // 상위 작업 찾기
+  const findParentTask = (taskId: string, taskList: WBSTask[]): WBSTask | null => {
+    for (const task of taskList) {
+      if (task.children) {
+        for (const child of task.children) {
+          if (child.id === taskId) {
+            return task
+          }
+          // 재귀적으로 하위 작업에서도 찾기
+          const found = findParentTask(taskId, [child])
+          if (found) return found
+        }
+      }
+    }
+    return null
+  }
+
+  // 필터링된 담당자 목록
+  const filteredTaskAssignees = useMemo(() => {
+    return companyMembers.filter(member =>
+      member.display_name.toLowerCase().includes(taskAssigneeSearchTerm.toLowerCase()) ||
+      member.email.toLowerCase().includes(taskAssigneeSearchTerm.toLowerCase()) ||
+      member.role.toLowerCase().includes(taskAssigneeSearchTerm.toLowerCase())
+    )
+  }, [companyMembers, taskAssigneeSearchTerm])
+
+  // 작업으로 이동하는 함수
+  const navigateToTask = (taskId: string) => {
+    // 모든 작업을 평면화하여 찾기
+    const findTaskById = (taskList: WBSTask[]): WBSTask | null => {
+      for (const task of taskList) {
+        if (task.id === taskId) {
+          return task
+        }
+        if (task.children) {
+          const found = findTaskById(task.children)
+          if (found) return found
+        }
+      }
+      return null
+    }
+
+    const targetTask = findTaskById(tasks)
+    if (targetTask) {
+      openTaskDetailModal(targetTask)
+    }
+  }
+
+  // 파일 크기 포맷팅
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  // 파일 업로드 처리
+  const handleFileUpload = (files: FileList) => {
+    if (!editingTask) return
+
+    const newAttachments: AttachmentFile[] = Array.from(files).map(file => ({
+      id: Math.random().toString(36).substr(2, 9),
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      uploadedAt: new Date().toISOString()
+    }))
+
+    const updatedAttachments = [...(editingTask.attachments || []), ...newAttachments]
+    updateTaskField('attachments', updatedAttachments)
+    
+    toast({
+      title: "파일 업로드 완료",
+      description: `${files.length}개의 파일이 업로드되었습니다.`
+    })
+  }
+
+  // 파일 삭제
+  const removeAttachment = (attachmentId: string) => {
+    if (!editingTask) return
+
+    const updatedAttachments = editingTask.attachments?.filter(att => att.id !== attachmentId) || []
+    updateTaskField('attachments', updatedAttachments)
+    
+    toast({
+      title: "파일 삭제 완료",
+      description: "파일이 삭제되었습니다."
+    })
+  }
+
+  // 드래그 앤 드롭 이벤트 핸들러
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      handleFileUpload(files)
+    }
+  }
+
+  // 파일 선택 핸들러
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      handleFileUpload(files)
+    }
+  }
+
+  // 개별 파일 다운로드
+  const downloadFile = (attachment: AttachmentFile) => {
+    // 실제 파일이 있다면 다운로드, 없으면 알림
+    if (attachment.url) {
+      const link = document.createElement('a')
+      link.href = attachment.url
+      link.download = attachment.name
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } else {
+      toast({
+        title: "다운로드 불가",
+        description: "파일이 서버에 저장되지 않았습니다.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // 모든 파일 다운로드 (ZIP으로 압축)
+  const downloadAllFiles = () => {
+    if (!editingTask?.attachments || editingTask.attachments.length === 0) {
+      toast({
+        title: "다운로드할 파일 없음",
+        description: "첨부된 파일이 없습니다.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // 실제 구현에서는 서버에서 ZIP 파일을 생성하여 다운로드
+    // 현재는 개별 파일들을 순차적으로 다운로드
+    editingTask.attachments.forEach((attachment, index) => {
+      setTimeout(() => {
+        downloadFile(attachment)
+      }, index * 500) // 0.5초 간격으로 다운로드
+    })
+
+    toast({
+      title: "다운로드 시작",
+      description: `${editingTask.attachments.length}개의 파일을 다운로드합니다.`
+    })
   }
 
   // WBS 통계 계산 함수들
@@ -1448,6 +1812,25 @@ export default function WBSManagement() {
                   const value = target.value.replace(/[^0-9]/g, '')
                   handleDateInput(task.id, 'endDate', pos, value, target)
                 }}
+                onInput={(e) => {
+                  const target = e.target as HTMLInputElement
+                  const value = target.value.replace(/[^0-9]/g, '')
+                  handleDateInput(task.id, 'endDate', pos, value, target)
+                  // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
+                  if (value && pos < 7) {
+                    setTimeout(() => {
+                      // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
+                      const dateContainer = target.closest('.flex.items-center.gap-0')
+                      const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
+                      const currentIndex = Array.from(allInputs).indexOf(target)
+                      const nextInput = allInputs[currentIndex + 1]
+                      if (nextInput) {
+                        nextInput.focus()
+                        nextInput.select()
+                      }
+                    }, 0)
+                  }
+                }}
                 onKeyDown={(e) => {
                   const target = e.target as HTMLInputElement
                   if (e.key === 'Backspace' && !target.value && pos > 0) {
@@ -1506,6 +1889,25 @@ export default function WBSManagement() {
                   const target = e.target as HTMLInputElement
                   const value = target.value.replace(/[^0-9]/g, '')
                   handleDateInput(task.id, 'endDate', pos, value, target)
+                }}
+                onInput={(e) => {
+                  const target = e.target as HTMLInputElement
+                  const value = target.value.replace(/[^0-9]/g, '')
+                  handleDateInput(task.id, 'endDate', pos, value, target)
+                  // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
+                  if (value && pos < 7) {
+                    setTimeout(() => {
+                      // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
+                      const dateContainer = target.closest('.flex.items-center.gap-0')
+                      const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
+                      const currentIndex = Array.from(allInputs).indexOf(target)
+                      const nextInput = allInputs[currentIndex + 1]
+                      if (nextInput) {
+                        nextInput.focus()
+                        nextInput.select()
+                      }
+                    }, 0)
+                  }
                 }}
                 onKeyDown={(e) => {
                   const target = e.target as HTMLInputElement
@@ -1566,6 +1968,25 @@ export default function WBSManagement() {
                   const value = target.value.replace(/[^0-9]/g, '')
                   handleDateInput(task.id, 'endDate', pos, value, target)
                 }}
+                onInput={(e) => {
+                  const target = e.target as HTMLInputElement
+                  const value = target.value.replace(/[^0-9]/g, '')
+                  handleDateInput(task.id, 'endDate', pos, value, target)
+                  // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
+                  if (value && pos < 7) {
+                    setTimeout(() => {
+                      // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
+                      const dateContainer = target.closest('.flex.items-center.gap-0')
+                      const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
+                      const currentIndex = Array.from(allInputs).indexOf(target)
+                      const nextInput = allInputs[currentIndex + 1]
+                      if (nextInput) {
+                        nextInput.focus()
+                        nextInput.select()
+                      }
+                    }, 0)
+                  }
+                }}
                 onKeyDown={(e) => {
                   const target = e.target as HTMLInputElement
                   if (e.key === 'Backspace' && !target.value && pos > 0) {
@@ -1621,6 +2042,24 @@ export default function WBSManagement() {
             <User className="w-4 h-4" />
             <span className="truncate max-w-[120px]">{task.assignee}</span>
             <UserPlus className="w-3 h-3 opacity-50" />
+          </Button>
+        </div>
+
+        {/* 최종 산출물 */}
+        <div className="w-32 flex items-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openDeliverableModal(task.id)}
+            className="flex items-center gap-2 h-8 px-2 text-xs w-full"
+          >
+            <Upload className="w-3 h-3" />
+            <span className="truncate">
+              {task.deliverables && task.deliverables.length > 0 
+                ? `${task.deliverables.length}개` 
+                : '업로드'
+              }
+            </span>
           </Button>
         </div>
       </div>
@@ -1714,117 +2153,27 @@ export default function WBSManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Task 상세 모달 */}
-      <Dialog open={taskDetailModalOpen} onOpenChange={setTaskDetailModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>작업 상세 정보</DialogTitle>
-            <DialogDescription>
-              선택한 작업의 상세 정보를 확인할 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedTaskDetail && (
-            <div className="space-y-6">
-              {/* 기본 정보 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">ID</label>
-                  <div className="text-sm font-mono bg-gray-100 px-3 py-2 rounded">
-                    {selectedTaskDetail.id}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">레벨</label>
-                  <div className="text-sm bg-gray-100 px-3 py-2 rounded">
-                    Level {selectedTaskDetail.level}
-                  </div>
-                </div>
-              </div>
+      {/* Task 상세 모달 - 공통 컴포넌트 사용 */}
+      <TaskDetailModal
+        isOpen={taskDetailModalOpen}
+        onClose={() => setTaskDetailModalOpen(false)}
+        task={selectedTaskDetail}
+        companyMembers={companyMembers}
+        onTaskUpdate={(updatedTask) => {
+          // 작업 업데이트 처리
+          setSelectedTaskDetail(updatedTask)
+          // 실제로는 여기서 API 호출하여 저장
+        }}
+        allTasks={tasks}
+        onNavigateToTask={(taskId) => {
+          const task = findTaskById(tasks, taskId)
+          if (task) {
+            openTaskDetailModal(task)
+          }
+        }}
+      />
 
-              {/* 작업명 */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-500">작업명</label>
-                <div className="text-lg font-medium bg-gray-100 px-3 py-2 rounded">
-                  {selectedTaskDetail.name}
-                </div>
-              </div>
 
-              {/* 진행률과 상태 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">진행률</label>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-32 bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${getProgressColor(selectedTaskDetail.progress)}`}
-                          style={{ width: `${selectedTaskDetail.progress}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-medium">{selectedTaskDetail.progress}%</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">상태</label>
-                  <div className="flex items-center gap-2">
-                    <Badge className={getStatusColor(selectedTaskDetail.status)}>
-                      {selectedTaskDetail.status}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              {/* 날짜 정보 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">시작일</label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm">{selectedTaskDetail.startDate}</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">종료일</label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm">{selectedTaskDetail.endDate}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 담당자 */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-500">담당자</label>
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm">{selectedTaskDetail.assignee}</span>
-                </div>
-              </div>
-
-              {/* 하위 작업이 있는 경우 */}
-              {selectedTaskDetail.children && selectedTaskDetail.children.length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">하위 작업</label>
-                  <div className="space-y-1">
-                    {selectedTaskDetail.children.map((child) => (
-                      <div key={child.id} className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded">
-                        <span className="font-mono text-xs">{child.id}</span>
-                        <span>{child.name}</span>
-                        <Badge className={getStatusColor(child.status)} variant="outline">
-                          {child.status}
-                        </Badge>
-                        <span className="text-xs text-gray-500">{child.progress}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -1939,6 +2288,7 @@ export default function WBSManagement() {
                 <div className="flex-1">시작일</div>
                 <div className="flex-1">종료일</div>
                 <div className="flex-1">담당자</div>
+                <div className="w-32">최종 산출물</div>
               </div>
 
               {/* 작업 목록 */}
@@ -2169,15 +2519,49 @@ export default function WBSManagement() {
                 </div>
               </div>
 
-              {/* 범례 */}
-              <div className="flex items-center gap-6 p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-blue-200 rounded"></div>
-                  <span className="text-sm">Lv1 작업</span>
+              {/* 범례 - 실제 사용되는 Lv1 작업 유형별 색상 */}
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Lv1 작업 유형별 색상 구분</h4>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded" style={{ backgroundColor: '#3b82f6' }}></div>
+                    <span className="text-sm">1. 프로젝트 기획 (Lv1)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded" style={{ backgroundColor: '#93c5fd' }}></div>
+                    <span className="text-sm">1. 프로젝트 기획 (Lv2)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded" style={{ backgroundColor: '#dbeafe' }}></div>
+                    <span className="text-sm">1. 프로젝트 기획 (Lv3)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded" style={{ backgroundColor: '#10b981' }}></div>
+                    <span className="text-sm">2. 디자인 (Lv1)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded" style={{ backgroundColor: '#6ee7b7' }}></div>
+                    <span className="text-sm">2. 디자인 (Lv2)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded" style={{ backgroundColor: '#a7f3d0' }}></div>
+                    <span className="text-sm">2. 디자인 (Lv3)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded" style={{ backgroundColor: '#f59e0b' }}></div>
+                    <span className="text-sm">3. 개발 (Lv1)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded" style={{ backgroundColor: '#fcd34d' }}></div>
+                    <span className="text-sm">3. 개발 (Lv2)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded" style={{ backgroundColor: '#fde68a' }}></div>
+                    <span className="text-sm">3. 개발 (Lv3)</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-green-200 rounded"></div>
-                  <span className="text-sm">Lv2 작업</span>
+                <div className="mt-3 text-xs text-gray-500">
+                  <p>• 각 Lv1 작업 유형 내에서 Lv2는 중간 색상, Lv3는 연한 색상으로 표시됩니다.</p>
                 </div>
               </div>
             </div>
@@ -2185,200 +2569,133 @@ export default function WBSManagement() {
         </CardContent>
       </Card>
 
-      {/* 담당자 선택 모달 */}
-      <Dialog open={assigneeModalOpen} onOpenChange={setAssigneeModalOpen}>
-        <DialogContent className="max-w-md">
+      {/* 최종 산출물 관리 모달 */}
+      <Dialog open={deliverableModalOpen} onOpenChange={setDeliverableModalOpen}>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>담당자 관리</DialogTitle>
+            <DialogTitle>최종 산출물 관리</DialogTitle>
             <DialogDescription>
-              작업의 담당자를 선택하세요.
+              작업의 최종 산출물을 업로드하고 관리하세요.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
-            {/* 프로젝트 기업 정보 표시 */}
-            {selectedProjectCompany ? (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800">
-                    {selectedProjectCompany.name}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-800">
-                    개인 프로젝트
-                  </span>
-                </div>
-              </div>
-            )}
-            
-            {/* 검색 입력 */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="이름, 이메일, 역할로 검색..."
-                value={assigneeSearchTerm}
-                onChange={(e) => setAssigneeSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+            {/* 업로드 영역 */}
+            <div
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                isDeliverableDragOver
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault()
+                setIsDeliverableDragOver(true)
+              }}
+              onDragLeave={() => setIsDeliverableDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setIsDeliverableDragOver(false)
+                const files = e.dataTransfer.files
+                if (files.length > 0) {
+                  handleDeliverableUpload(files)
+                }
+              }}
+            >
+              <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+              <p className="text-sm text-gray-600 mb-2">
+                파일을 드래그하여 업로드하거나
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const input = document.createElement('input')
+                  input.type = 'file'
+                  input.multiple = true
+                  input.onchange = (e) => {
+                    const files = (e.target as HTMLInputElement).files
+                    if (files && files.length > 0) {
+                      handleDeliverableUpload(files)
+                    }
+                  }
+                  input.click()
+                }}
+              >
+                파일 선택
+              </Button>
             </div>
-            
-            {/* 구성원 목록 */}
-            <div className="max-h-60 overflow-y-auto space-y-2">
-              {filteredMembers.length > 0 ? (
-                filteredMembers.map((member) => {
-                  console.log('렌더링 중인 멤버:', member, 'role === Owner?', member.role === 'Owner')
-                  return (
-                    <div
-                      key={member.id}
-                      onClick={() => selectAssignee(member)}
-                      className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
+
+            {/* 업로드된 파일 목록 */}
+            {(() => {
+              const task = findTaskById(tasks, selectedDeliverableTaskId)
+              const deliverables = task?.deliverables || []
+              
+              if (deliverables.length === 0) {
+                return (
+                  <div className="text-center py-8 text-gray-500">
+                    업로드된 산출물이 없습니다.
+                  </div>
+                )
+              }
+
+              return (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-sm font-medium">업로드된 파일 ({deliverables.length}개)</h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadAllDeliverables(selectedDeliverableTaskId)}
                     >
-                      <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                        <User className="w-4 h-4 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm flex items-center gap-2">
-                          {member.name}
-                          {member.role === 'Owner' && (
-                            <Badge variant="secondary" className="text-xs">
-                              Owner
-                            </Badge>
-                          )}
+                      <Download className="w-4 h-4 mr-1" />
+                      모두 다운로드
+                    </Button>
+                  </div>
+                  
+                  <div className="max-h-60 overflow-y-auto space-y-2">
+                    {deliverables.map((deliverable) => (
+                      <div
+                        key={deliverable.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+                      >
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                          <File className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {deliverable.name}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {(deliverable.size / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-500 truncate">{member.email}</div>
-                        <div className="text-xs text-gray-400">{member.role}</div>
-                      </div>
-                    </div>
-                  )
-                })
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <User className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>검색 결과가 없습니다.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Task 상세 모달 */}
-      <Dialog open={taskDetailModalOpen} onOpenChange={setTaskDetailModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>작업 상세 정보</DialogTitle>
-            <DialogDescription>
-              선택한 작업의 상세 정보를 확인할 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedTaskDetail && (
-            <div className="space-y-6">
-              {/* 기본 정보 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">ID</label>
-                  <div className="text-sm font-mono bg-gray-100 px-3 py-2 rounded">
-                    {selectedTaskDetail.id}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">레벨</label>
-                  <div className="text-sm bg-gray-100 px-3 py-2 rounded">
-                    Level {selectedTaskDetail.level}
-                  </div>
-                </div>
-              </div>
-
-              {/* 작업명 */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-500">작업명</label>
-                <div className="text-lg font-medium bg-gray-100 px-3 py-2 rounded">
-                  {selectedTaskDetail.name}
-                </div>
-              </div>
-
-              {/* 진행률과 상태 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">진행률</label>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-32 bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${getProgressColor(selectedTaskDetail.progress)}`}
-                          style={{ width: `${selectedTaskDetail.progress}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-medium">{selectedTaskDetail.progress}%</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">상태</label>
-                  <div className="flex items-center gap-2">
-                    <Badge className={getStatusColor(selectedTaskDetail.status)}>
-                      {selectedTaskDetail.status}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              {/* 날짜 정보 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">시작일</label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm">{selectedTaskDetail.startDate}</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">종료일</label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm">{selectedTaskDetail.endDate}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 담당자 */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-500">담당자</label>
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm">{selectedTaskDetail.assignee}</span>
-                </div>
-              </div>
-
-              {/* 하위 작업이 있는 경우 */}
-              {selectedTaskDetail.children && selectedTaskDetail.children.length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-500">하위 작업</label>
-                  <div className="space-y-1">
-                    {selectedTaskDetail.children.map((child) => (
-                      <div key={child.id} className="flex items-center gap-2 text-sm bg-gray-50 px-3 py-2 rounded">
-                        <span className="font-mono text-xs">{child.id}</span>
-                        <span>{child.name}</span>
-                        <Badge className={getStatusColor(child.status)} variant="outline">
-                          {child.status}
-                        </Badge>
-                        <span className="text-xs text-gray-500">{child.progress}%</span>
+                        
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => downloadDeliverable(deliverable)}
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeDeliverable(selectedDeliverableTaskId, deliverable.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
-          )}
+              )
+            })()}
+          </div>
         </DialogContent>
       </Dialog>
+
     </div>
   )
 }

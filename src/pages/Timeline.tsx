@@ -28,7 +28,8 @@ export default function Timeline() {
       progress: 100,
       assignee: "프로젝트 매니저",
       status: "완료",
-      color: "bg-blue-200"
+      color: "bg-blue-200",
+      level: 1
     },
     {
       id: "2",
@@ -39,7 +40,8 @@ export default function Timeline() {
       progress: 85,
       assignee: "설계팀",
       status: "진행중",
-      color: "bg-green-200"
+      color: "bg-green-200",
+      level: 2
     },
     {
       id: "3",
@@ -50,7 +52,8 @@ export default function Timeline() {
       progress: 60,
       assignee: "개발팀",
       status: "진행중",
-      color: "bg-orange-200"
+      color: "bg-orange-200",
+      level: 3
     },
     {
       id: "4",
@@ -61,7 +64,8 @@ export default function Timeline() {
       progress: 45,
       assignee: "개발팀",
       status: "진행중",
-      color: "bg-pink-200"
+      color: "bg-pink-200",
+      level: 4
     },
 
     // 웹사이트 리뉴얼 프로젝트
@@ -74,7 +78,8 @@ export default function Timeline() {
       progress: 100,
       assignee: "프로젝트 매니저",
       status: "완료",
-      color: "bg-blue-200"
+      color: "bg-blue-200",
+      level: 1
     },
     {
       id: "6",
@@ -85,7 +90,8 @@ export default function Timeline() {
       progress: 100,
       assignee: "디자인팀",
       status: "완료",
-      color: "bg-green-200"
+      color: "bg-green-200",
+      level: 2
     },
     {
       id: "7",
@@ -96,7 +102,8 @@ export default function Timeline() {
       progress: 80,
       assignee: "개발팀",
       status: "진행중",
-      color: "bg-orange-200"
+      color: "bg-orange-200",
+      level: 3
     },
 
     // 모바일 앱 개발
@@ -109,7 +116,8 @@ export default function Timeline() {
       progress: 0,
       assignee: "프로젝트 매니저",
       status: "계획중",
-      color: "bg-blue-200"
+      color: "bg-blue-200",
+      level: 1
     },
     {
       id: "9",
@@ -120,7 +128,8 @@ export default function Timeline() {
       progress: 0,
       assignee: "디자인팀",
       status: "계획중",
-      color: "bg-green-200"
+      color: "bg-green-200",
+      level: 2
     },
     {
       id: "10",
@@ -131,7 +140,8 @@ export default function Timeline() {
       progress: 0,
       assignee: "개발팀",
       status: "계획중",
-      color: "bg-orange-200"
+      color: "bg-orange-200",
+      level: 3
     }
   ]
 
@@ -389,28 +399,29 @@ export default function Timeline() {
         </CardContent>
       </Card>
 
-      {/* 범례 */}
+      {/* 범례 - Lv1 작업 단계별 색상 */}
       <Card>
         <CardHeader>
           <CardTitle>범례</CardTitle>
+          <CardDescription>Lv1 작업 단계별 색상 구분</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-blue-200 rounded"></div>
-              <span className="text-sm">프로젝트 기획</span>
+              <span className="text-sm">1단계: 프로젝트 기획</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-green-200 rounded"></div>
-              <span className="text-sm">디자인/설계</span>
+              <span className="text-sm">2단계: 설계/디자인</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-orange-200 rounded"></div>
-              <span className="text-sm">개발</span>
+              <span className="text-sm">3단계: 개발/구현</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-pink-200 rounded"></div>
-              <span className="text-sm">기타</span>
+              <span className="text-sm">4단계: 테스트/배포</span>
             </div>
           </div>
         </CardContent>

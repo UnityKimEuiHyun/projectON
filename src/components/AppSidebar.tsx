@@ -5,7 +5,6 @@ import {
   Users, 
   Calendar, 
   Settings,
-  Plus,
   LogOut,
   User,
   BarChart3,
@@ -15,18 +14,20 @@ import {
   ClipboardList,
   BookOpen,
   MessageSquare,
-  Briefcase,
   ChevronDown,
   ChevronRight,
-  CalendarDays,
   GanttChart,
-  MapPin,
   List,
-  UserCheck
+  UserCheck,
+  ArrowLeft,
+  Search,
+  Building2
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
-import { ProjectCreateModal } from "./ProjectCreateModal"
+import { useSidebarState } from "@/hooks/useSidebarState"
+import { ProjectSelectorModal } from "./ProjectSelectorModal"
+import { CompanySelectorModal } from "./CompanySelectorModal"
 import { supabase } from "@/integrations/supabase/client"
 import type { Database } from "@/integrations/supabase/types"
 
@@ -47,25 +48,25 @@ import { Button } from "@/components/ui/button"
 
 type Project = Database['public']['Tables']['projects']['Row']
 
-// 메인 메뉴 아이템
-const mainItems = [
+// 개인 관리 메뉴
+const personalItems = [
   { title: "대시보드", url: "/", icon: LayoutDashboard },
   { title: "캘린더", url: "/calendar", icon: Calendar },
 ]
 
 // 구성원 관리 메뉴
-const teamItems = [
+const teamManagementItems = [
   { title: "구성원 관리", url: "/team", icon: Users },
 ]
 
-// 프로젝트 관리 메뉴
+// 전체 프로젝트 관리 메뉴
 const projectManagementItems = [
-  { title: "전체 프로젝트 목록", url: "/projects", icon: FolderOpen },
+  { title: "전체 프로젝트 구성", url: "/projects", icon: FolderOpen },
   { title: "전체 프로젝트 계획", url: "/timeline", icon: GanttChart },
 ]
 
-// 열린 프로젝트 관리 메뉴 (동적으로 생성됨)
-const getOpenProjectItems = (projectName: string, userRole: string | null) => {
+// 현재 프로젝트 관리 메뉴
+const getCurrentProjectItems = (userRole: string | null) => {
   const allItems = [
     { title: "프로젝트 요약", url: "/projects/summary", icon: BarChart3 },
     { title: "WBS 관리", url: "/projects/wbs", icon: List },
@@ -92,16 +93,15 @@ const settingsItems = [
 ]
 
 export function AppSidebar() {
-  const { user, signOut } = useAuth();
+  const { user, signOut } = useAuth()
   const { state, setOpenMobile } = useSidebar()
+  const { currentMode, selectedProject, selectedCompany, switchToAllProjectsMode, switchToProjectMode, setSelectedCompany } = useSidebarState()
   const location = useLocation()
   const currentPath = location.pathname
   const collapsed = state === "collapsed"
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set())
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false)
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
-  const [showProjectSubMenu, setShowProjectSubMenu] = useState(false)
-  const [openProject, setOpenProject] = useState<Project | null>(null)
+  const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false)
+  const [isCompanySelectorOpen, setIsCompanySelectorOpen] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
 
   // 사용자 권한 로드
@@ -115,8 +115,8 @@ export function AppSidebar() {
             .eq('user_id', user.id)
             .single()
 
-          if (!error && profile) {
-            setUserRole(profile.authority)
+          if (!error && profile && 'authority' in profile) {
+            setUserRole(profile.authority as string)
           }
         } catch (error) {
           console.error('사용자 권한 로드 실패:', error)
@@ -125,51 +125,6 @@ export function AppSidebar() {
     }
     loadUserRole()
   }, [user])
-
-  // 프로젝트 선택 상태를 localStorage에서 복원
-  useEffect(() => {
-    const savedProject = localStorage.getItem('selectedProject')
-    if (savedProject) {
-      try {
-        setSelectedProject(JSON.parse(savedProject))
-        setShowProjectSubMenu(true)
-      } catch (e) {
-        console.error('Failed to parse saved project:', e)
-      }
-    }
-  }, [])
-
-  // 열린 프로젝트 상태를 localStorage에서 복원
-  useEffect(() => {
-    const savedOpenProject = localStorage.getItem('openProject')
-    if (savedOpenProject) {
-      try {
-        setOpenProject(JSON.parse(savedOpenProject))
-      } catch (e) {
-        console.error('Failed to parse saved open project:', e)
-      }
-    }
-  }, [])
-
-  // localStorage 변경 이벤트 리스너
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'openProject') {
-        if (e.newValue) {
-          try {
-            setOpenProject(JSON.parse(e.newValue))
-          } catch (error) {
-            console.error('Failed to parse open project from storage event:', error)
-          }
-        } else {
-          setOpenProject(null)
-        }
-      }
-    }
-
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
-  }, [])
 
   const isActive = (path: string) => {
     if (path === "/") {
@@ -198,32 +153,10 @@ export function AppSidebar() {
     setExpandedMenus(newExpanded)
   }
 
-  const handleProjectCreated = (newProject: Project) => {
-    // 프로젝트 생성 후 처리 로직
-    console.log("새 프로젝트 생성됨:", newProject)
-    // 필요시 페이지 새로고침 또는 상태 업데이트
-  }
 
-  const clearProjectSelection = () => {
-    setSelectedProject(null)
-    setShowProjectSubMenu(false)
-    localStorage.removeItem('selectedProject')
-  }
 
-  const openProjectHandler = (project: Project) => {
-    setOpenProject(project)
-    localStorage.setItem('openProject', JSON.stringify(project))
-  }
-
-  const closeProjectHandler = () => {
-    setOpenProject(null)
-    localStorage.removeItem('openProject')
-    // 다른 탭에서도 상태가 업데이트되도록 이벤트 발생
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'openProject',
-      newValue: null,
-      oldValue: localStorage.getItem('openProject')
-    }))
+  const handleCompanySelect = (company: any) => {
+    setSelectedCompany(company)
   }
 
   const renderMenuItem = (item: any, level: number = 0) => {
@@ -235,7 +168,6 @@ export function AppSidebar() {
       if (hasSubItems) {
         toggleMenu(item.title)
       } else {
-        // 모바일에서 사이드바 닫기
         setOpenMobile(false)
       }
     }
@@ -290,131 +222,158 @@ export function AppSidebar() {
     )
   }
 
+  const renderAllProjectsSidebar = () => (
+    <>
+      {/* Header - 전체 프로젝트 모드 (파란색 테마) */}
+      <div className="p-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-100 to-blue-200/50">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-sm">P</span>
+          </div>
+          {!collapsed && (
+            <div>
+              <h2 className="text-lg font-semibold text-blue-900">ProjectON</h2>
+              <p className="text-xs text-blue-600">전체 프로젝트 관리</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 개인 관리 섹션 */}
+      <SidebarGroup>
+        <SidebarGroupLabel className="text-blue-700 font-semibold">개인 관리</SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            {personalItems.map((item) => renderMenuItem(item))}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+
+      {/* 기업 선택 버튼 */}
+      {!collapsed && (
+        <div className="p-4 pb-2">
+          <Button
+            className="w-full border-blue-300 text-blue-700 hover:bg-blue-100"
+            size="sm"
+            onClick={() => setIsCompanySelectorOpen(true)}
+            variant="outline"
+          >
+            <Building2 className="w-4 h-4 mr-2" />
+            {selectedCompany ? selectedCompany.name : "소속 기업 선택"}
+          </Button>
+        </div>
+      )}
+
+      {/* 프로젝트 선택 버튼 */}
+      {!collapsed && selectedCompany && (
+        <div className="px-4 pb-4">
+          <Button 
+            className="w-full border-blue-300 text-blue-700 hover:bg-blue-100" 
+            size="sm"
+            onClick={() => setIsProjectSelectorOpen(true)}
+            variant="outline"
+          >
+            <Search className="w-4 h-4 mr-2" />
+            프로젝트 선택
+          </Button>
+        </div>
+      )}
+
+      {/* 구성원 관리 섹션 */}
+      <SidebarGroup>
+        <SidebarGroupLabel className="text-blue-700 font-semibold">구성원 관리</SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            {teamManagementItems.map((item) => renderMenuItem(item))}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+
+      {/* 전체 프로젝트 관리 섹션 */}
+      <SidebarGroup>
+        <SidebarGroupLabel className="text-blue-700 font-semibold">전체 프로젝트 관리</SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            {projectManagementItems.map((item) => renderMenuItem(item))}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    </>
+  )
+
+  const renderCurrentProjectSidebar = () => (
+    <>
+      {/* Header - 현재 프로젝트 모드 (초록색 테마) */}
+      <div className="p-4 border-b-2 border-green-200 bg-gradient-to-r from-green-100 to-green-200/50">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-sm">P</span>
+          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg font-semibold text-green-900 truncate">{selectedProject?.name}</h2>
+              <p className="text-xs text-green-600 truncate">{selectedProject?.description}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 전체 프로젝트로 돌아가기 버튼 */}
+      {!collapsed && (
+        <div className="p-4 pb-2">
+          <Button 
+            className="w-full border-green-300 text-green-700 hover:bg-green-100" 
+            size="sm"
+            onClick={switchToAllProjectsMode}
+            variant="outline"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            전체 프로젝트 관리
+          </Button>
+        </div>
+      )}
+
+      {/* 프로젝트 선택 버튼 */}
+      {!collapsed && (
+        <div className="px-4 pb-4">
+          <Button 
+            className="w-full border-green-300 text-green-700 hover:bg-green-100" 
+            size="sm"
+            onClick={() => setIsProjectSelectorOpen(true)}
+            variant="outline"
+          >
+            <Search className="w-4 h-4 mr-2" />
+            프로젝트 선택
+          </Button>
+        </div>
+      )}
+
+      {/* 현재 프로젝트 메뉴 */}
+      <SidebarGroup>
+        <SidebarGroupLabel className="text-green-700 font-semibold">
+          <span>{selectedProject?.name || '현재 프로젝트'}</span>
+        </SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            {getCurrentProjectItems(userRole).map((item) => renderMenuItem(item))}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    </>
+  )
+
   return (
     <>
       <Sidebar
-        className={collapsed ? "w-14" : "w-64"}
+        className={`${collapsed ? "w-14" : "w-64"} ${
+          currentMode === 'all-projects' 
+            ? "bg-gradient-to-b from-blue-50 to-blue-100/50 border-r-2 border-blue-300" 
+            : "bg-gradient-to-b from-green-50 to-green-100/50 border-r-2 border-green-300"
+        }`}
         collapsible="icon"
       >
         <SidebarContent>
-          {/* Header */}
-          <div className="p-4 border-b">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">P</span>
-              </div>
-                              {!collapsed && (
-                  <div>
-                    <h2 className="text-lg font-semibold">ProjectON</h2>
-                    {selectedProject ? (
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm text-primary font-medium">{selectedProject.name}</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={clearProjectSelection}
-                          className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
-                        >
-                          ×
-                        </Button>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">프로젝트 관리</p>
-                    )}
-                  </div>
-                )}
-            </div>
-          </div>
-
-          {/* Quick Action */}
-          {!collapsed && (
-            <div className="p-4">
-              <Button 
-                className="w-full" 
-                size="sm"
-                onClick={() => setIsProjectModalOpen(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                새 프로젝트
-              </Button>
-            </div>
-          )}
-
-          {/* Main Navigation */}
-          <SidebarGroup>
-            <SidebarGroupLabel>개인 관리</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {mainItems.map((item) => renderMenuItem(item))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          {/* Team Management */}
-          <SidebarGroup>
-            <SidebarGroupLabel>구성원 관리</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {teamItems.map((item) => renderMenuItem(item))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          {/* Project Management */}
-          <SidebarGroup>
-            <SidebarGroupLabel>전체 프로젝트 관리</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {projectManagementItems.map((item) => renderMenuItem(item))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          {/* Open Project Section */}
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-blue-600">
-              <span>열린 프로젝트</span>
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              {openProject ? (
-                <>
-                  <div className="px-2 py-2 mb-2 bg-blue-50 border border-blue-200 rounded-md">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2 flex-1 min-w-0">
-                        <FolderOpen className="w-4 h-4 text-blue-600" />
-                        <span className="text-sm font-semibold text-blue-700 truncate">
-                          {openProject.name}
-                        </span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={closeProjectHandler}
-                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground flex-shrink-0"
-                      >
-                        ×
-                      </Button>
-                    </div>
-                    <p className="text-xs text-blue-500 mt-1 truncate">
-                      {openProject.description}
-                    </p>
-                  </div>
-                  <SidebarMenu>
-                    {getOpenProjectItems(openProject.name, userRole).map((item) => renderMenuItem(item))}
-                  </SidebarMenu>
-                </>
-              ) : (
-                <div className="px-2 py-4 text-center bg-blue-50/50 border border-blue-200/50 rounded-md">
-                  <p className="text-sm text-blue-600">
-                    열린 프로젝트가 없습니다
-                  </p>
-                  <p className="text-xs text-blue-500 mt-1">
-                    프로젝트 목록에서 프로젝트를 열어보세요
-                  </p>
-                </div>
-              )}
-            </SidebarGroupContent>
-          </SidebarGroup>
+          {currentMode === 'all-projects' ? renderAllProjectsSidebar() : renderCurrentProjectSidebar()}
 
           {/* Settings */}
           <SidebarGroup>
@@ -425,6 +384,7 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
+        
         <SidebarFooter>
           <div className="p-2 space-y-2">
             <div className="text-xs text-muted-foreground">
@@ -457,11 +417,18 @@ export function AppSidebar() {
         </SidebarFooter>
       </Sidebar>
 
-      {/* 프로젝트 생성 모달 */}
-      <ProjectCreateModal
-        isOpen={isProjectModalOpen}
-        onClose={() => setIsProjectModalOpen(false)}
-        onProjectCreated={handleProjectCreated}
+
+      {/* 기업 선택 모달 */}
+      <CompanySelectorModal
+        isOpen={isCompanySelectorOpen}
+        onClose={() => setIsCompanySelectorOpen(false)}
+        onCompanySelect={handleCompanySelect}
+      />
+
+      {/* 프로젝트 선택 모달 */}
+      <ProjectSelectorModal
+        isOpen={isProjectSelectorOpen}
+        onClose={() => setIsProjectSelectorOpen(false)}
       />
     </>
   )

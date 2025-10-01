@@ -244,14 +244,6 @@ const ProjectSummary = () => {
         </div>
       </div>
 
-      {/* 현재 프로젝트 정보 */}
-      <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
-        <Target className="w-5 h-5 text-primary" />
-        <div>
-          <span className="text-sm text-muted-foreground">현재 프로젝트:</span>
-          <span className="ml-2 text-lg font-semibold">{projectData.name}</span>
-        </div>
-      </div>
 
       {/* 프로젝트 관리 정보 */}
       {managementData && (

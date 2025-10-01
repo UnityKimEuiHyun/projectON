@@ -7,15 +7,287 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
   public: {
     Tables: {
+      activities: {
+        Row: {
+          action: string
+          created_at: string
+          description: string | null
+          id: string
+          metadata: Json | null
+          project_id: string | null
+          target_id: string | null
+          target_type: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          project_id?: string | null
+          target_id?: string | null
+          target_type: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          project_id?: string | null
+          target_id?: string | null
+          target_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          project_id: string
+          task_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          project_id: string
+          task_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+          task_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cost_management_shares: {
+        Row: {
+          created_at: string | null
+          id: string
+          permission_type: string
+          project_id: string
+          shared_by_user_id: string
+          shared_with_user_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          permission_type: string
+          project_id: string
+          shared_by_user_id: string
+          shared_with_user_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          permission_type?: string
+          project_id?: string
+          shared_by_user_id?: string
+          shared_with_user_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_management_shares_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_cost_management_shares_shared_by_user_id"
+            columns: ["shared_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "fk_cost_management_shares_shared_with_user_id"
+            columns: ["shared_with_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      group_join_requests: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          message: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_display_name: string | null
+          user_email: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_display_name?: string | null
+          user_email?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_display_name?: string | null
+          user_email?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_join_requests_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_members: {
+        Row: {
+          group_id: string
+          id: string
+          joined_at: string
+          role: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          joined_at?: string
+          role?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          joined_at?: string
+          role?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_group_members_user_id"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          parent_group_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          parent_group_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          parent_group_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "groups_parent_group_id_fkey"
+            columns: ["parent_group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          authority: string
           avatar_url: string | null
           created_at: string
           display_name: string | null
@@ -26,6 +298,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          authority?: string
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
@@ -36,6 +309,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          authority?: string
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
@@ -46,228 +320,294 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
-      },
-      groups: {
+      }
+      project_invitations: {
         Row: {
-          id: string
-          name: string
-          description: string | null
-          parent_group_id: string | null
-          created_by: string
           created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          description?: string | null
-          parent_group_id?: string | null
-          created_by: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          description?: string | null
-          parent_group_id?: string | null
-          created_by?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "groups_created_by_fkey"
-            columns: ["created_by"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "groups_parent_group_id_fkey"
-            columns: ["parent_group_id"]
-            referencedRelation: "groups"
-            referencedColumns: ["id"]
-          }
-        ]
-      },
-      group_members: {
-        Row: {
+          email: string
+          expires_at: string
           id: string
-          group_id: string
-          user_id: string
-          role: 'owner' | 'admin' | 'member'
-          status: 'active' | 'inactive' | 'pending' | 'suspended'
-          joined_at: string
-        }
-        Insert: {
-          id?: string
-          group_id: string
-          user_id: string
-          role?: string
-          status?: 'active' | 'inactive' | 'pending' | 'suspended'
-          joined_at?: string
-        }
-        Update: {
-          id?: string
-          group_id?: string
-          user_id?: string
-          role?: string
-          status?: 'active' | 'inactive' | 'pending' | 'suspended'
-          joined_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "group_members_group_id_fkey"
-            columns: ["group_id"]
-            referencedRelation: "groups"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "group_members_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
-      },
-      group_join_requests: {
-        Row: {
-          id: string
-          group_id: string
-          user_id: string
+          invited_by: string
+          project_id: string
+          role: string
           status: string
-          message: string | null
-          created_at: string
-          updated_at: string
-          reviewed_by: string | null
-          reviewed_at: string | null
         }
         Insert: {
-          id?: string
-          group_id: string
-          user_id: string
-          status?: string
-          message?: string | null
           created_at?: string
-          updated_at?: string
-          reviewed_by?: string | null
-          reviewed_at?: string | null
-        }
-        Update: {
+          email: string
+          expires_at?: string
           id?: string
-          group_id?: string
-          user_id?: string
-          status?: string
-          message?: string | null
-          created_at?: string
-          updated_at?: string
-          reviewed_by?: string | null
-          reviewed_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "group_join_requests_group_id_fkey"
-            columns: ["group_id"]
-            referencedRelation: "groups"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "group_join_requests_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "group_join_requests_reviewed_by_fkey"
-            columns: ["reviewed_by"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
-      },
-      projects: {
-        Row: {
-          id: string; // Changed from number to string for UUID
-          name: string; description: string | null; status: string; progress: number;
-          contract_date: string | null; estimate_amount: string | null; estimate_note: string | null; due_date: string | null; team_size: number | null; priority: string;
-          created_by: string; created_by_name: string; created_at: string; updated_at: string;
-        };
-        Insert: {
-          id?: string; // Changed from number to string for UUID
-          name: string; description?: string | null; status?: string; progress?: number;
-          contract_date?: string | null; estimate_amount?: string | null; estimate_note?: string | null; due_date?: string | null; team_size?: number | null; priority?: string;
-          created_by: string; created_by_name: string; created_at?: string; updated_at?: string;
-        };
-        Update: {
-          id?: string; // Changed from number to string for UUID
-          name?: string; description?: string | null; status?: string; progress?: number;
-          contract_date?: string | null; estimate_amount?: string | null; estimate_note?: string | null; due_date?: string | null; team_size?: number | null; priority?: string;
-          created_by?: string; created_by_name?: string; created_at?: string; updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "projects_created_by_fkey"
-            columns: ["created_by"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
-      },
-      cost_management_shares: {
-        Row: {
-          id: string
+          invited_by: string
           project_id: string
-          shared_by_user_id: string
-          shared_with_user_id: string
-          permission_type: 'view' | 'edit'
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          project_id: string
-          shared_by_user_id: string
-          shared_with_user_id: string
-          permission_type: 'view' | 'edit'
-          created_at?: string
-          updated_at?: string
+          role?: string
+          status?: string
         }
         Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
           id?: string
+          invited_by?: string
           project_id?: string
-          shared_by_user_id?: string
-          shared_with_user_id?: string
-          permission_type?: 'view' | 'edit'
-          created_at?: string
-          updated_at?: string
+          role?: string
+          status?: string
         }
         Relationships: [
           {
-            foreignKeyName: "cost_management_shares_project_id_fkey"
+            foreignKeyName: "project_invitations_project_id_fkey"
             columns: ["project_id"]
+            isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      project_members: {
+        Row: {
+          id: string
+          joined_at: string
+          project_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          project_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          project_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
           {
-            foreignKeyName: "cost_management_shares_shared_by_user_id_fkey"
-            columns: ["shared_by_user_id"]
-            referencedRelation: "users"
+            foreignKeyName: "project_members_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "cost_management_shares_shared_with_user_id_fkey"
-            columns: ["shared_with_user_id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
         ]
-      },
+      }
+      projects: {
+        Row: {
+          contract_date: string | null
+          created_at: string
+          created_by: string
+          created_by_name: string
+          description: string | null
+          due_date: string | null
+          estimate_amount: string | null
+          estimate_note: string | null
+          group_id: string | null
+          id: string
+          name: string
+          priority: string
+          progress: number
+          role: string
+          status: string
+          team_size: number | null
+          updated_at: string
+        }
+        Insert: {
+          contract_date?: string | null
+          created_at?: string
+          created_by: string
+          created_by_name: string
+          description?: string | null
+          due_date?: string | null
+          estimate_amount?: string | null
+          estimate_note?: string | null
+          group_id?: string | null
+          id?: string
+          name: string
+          priority?: string
+          progress?: number
+          role?: string
+          status?: string
+          team_size?: number | null
+          updated_at?: string
+        }
+        Update: {
+          contract_date?: string | null
+          created_at?: string
+          created_by?: string
+          created_by_name?: string
+          description?: string | null
+          due_date?: string | null
+          estimate_amount?: string | null
+          estimate_note?: string | null
+          group_id?: string | null
+          id?: string
+          name?: string
+          priority?: string
+          progress?: number
+          role?: string
+          status?: string
+          team_size?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      slimes: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          level: number | null
+          name: string
+          rarity: string
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          level?: number | null
+          name: string
+          rarity: string
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          level?: number | null
+          name?: string
+          rarity?: string
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          actual_hours: number | null
+          assigned_to: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          due_date: string | null
+          estimated_hours: number | null
+          id: string
+          priority: string
+          project_id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          actual_hours?: number | null
+          assigned_to?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          due_date?: string | null
+          estimated_hours?: number | null
+          id?: string
+          priority?: string
+          project_id: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          actual_hours?: number | null
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_date?: string | null
+          estimated_hours?: number | null
+          id?: string
+          priority?: string
+          project_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_favorites: {
+        Row: {
+          created_at: string | null
+          id: string
+          project_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          project_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          project_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_favorites_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      can_access_project: {
+        Args: { target_project_id: string }
+        Returns: boolean
+      }
+      debug_auth_state: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          auth_role: string
+          auth_uid: string
+          current_database: string
+          current_user_name: string
+        }[]
+      }
+      is_owner: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

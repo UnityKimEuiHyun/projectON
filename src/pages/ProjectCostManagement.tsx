@@ -146,25 +146,174 @@ export default function ProjectCostManagement() {
   }, [user, activeProject])
 
 
-  const profitLossData = {
-    revenue: 50000000,
-    costs: {
-      labor: 25000000,
-      materials: 8000000,
-      overhead: 5000000,
-      other: 2000000
-    },
-    profit: 10000000
+
+  // 등급별 MM 비용
+  const gradeCosts = {
+    special: 17879000,
+    high: 13938000,
+    intermediate: 10467000,
+    entry: 7783000
   }
 
-  const effortAllocation = [
-    { role: "프로젝트 매니저", hours: 160, rate: 50000, total: 8000000 },
-    { role: "시스템 분석가", hours: 200, rate: 45000, total: 9000000 },
-    { role: "UI/UX 디자이너", hours: 120, rate: 40000, total: 4800000 },
-    { role: "프론트엔드 개발자", hours: 300, rate: 50000, total: 15000000 },
-    { role: "백엔드 개발자", hours: 280, rate: 50000, total: 14000000 },
-    { role: "테스터", hours: 80, rate: 35000, total: 2800000 }
+  // 인건비 데이터 (이미지 기반)
+  const personnelExpenses = [
+    {
+      name: "김의현",
+      grade: "초급",
+      monthlyCosts: [1768864, 7783000, 7783000, 7783000, 7783000, 7783000, 7783000, 7783000],
+      remarks: ""
+    },
+    {
+      name: "황설",
+      grade: "초급",
+      monthlyCosts: [0, 5306591, 2476409, 0, 0, 0, 0, 0],
+      remarks: ""
+    },
+    {
+      name: "정건모",
+      grade: "초급",
+      monthlyCosts: [0, 7075455, 6014136, 7783000, 1768864, 0, 0, 0],
+      remarks: ""
+    },
+    {
+      name: "이수찬",
+      grade: "초급",
+      monthlyCosts: [0, 7783000, 3891500, 0, 0, 0, 0, 0],
+      remarks: ""
+    },
+    {
+      name: "장동권",
+      grade: "초급",
+      monthlyCosts: [0, 0, 4245273, 1415091, 0, 0, 0, 0],
+      remarks: ""
+    },
+    {
+      name: "최승옥",
+      grade: "초급",
+      monthlyCosts: [0, 0, 1415091, 2830182, 3891500, 0, 0, 0],
+      remarks: ""
+    },
+    {
+      name: "전현배",
+      grade: "초급",
+      monthlyCosts: [0, 0, 1415091, 2830182, 3891500, 0, 0, 0],
+      remarks: ""
+    }
   ]
+
+  // 월별 총 인건비 계산
+  const totalPersonnelCosts = personnelExpenses[0].monthlyCosts.map((_, monthIndex) => 
+    personnelExpenses.reduce((sum, person) => sum + person.monthlyCosts[monthIndex], 0)
+  )
+
+  // 4대보험 비용 (총 인건비의 10.5%)
+  const insuranceCosts = totalPersonnelCosts.map(total => Math.round(total * 0.105))
+
+  // 간접비 데이터
+  const indirectCosts = [
+    {
+      category: "지급수수료",
+      monthlyValues: ["입력", "입력", "입력", "입력", "입력", "입력", "입력", "입력"]
+    },
+    {
+      category: "지급임차료",
+      monthlyValues: ["입력", "입력", "입력", "입력", "입력", "입력", "입력", "입력"]
+    },
+    {
+      category: "수도광열비",
+      monthlyValues: ["입력", "입력", "입력", "입력", "입력", "입력", "입력", "입력"]
+    },
+    {
+      category: "감가상각",
+      monthlyValues: ["입력", "입력", "입력", "입력", "입력", "입력", "입력", "입력"]
+    },
+    {
+      category: "공통비계",
+      monthlyValues: ["-", "-", "-", "-", "-", "-", "-", "-"]
+    }
+  ]
+
+  // MM 데이터 (이미지 기반)
+  const personnelMMData = [
+    {
+      name: "김의현",
+      grade: "초급",
+      role: "PM",
+      task: "프로젝트 관리",
+      residency: "상주",
+      monthlyMM: [0.23, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00, 1.00],
+      totalMM: 7.23
+    },
+    {
+      name: "황설",
+      grade: "초급",
+      role: "TL",
+      task: "지표 계산 모듈",
+      residency: "비상주",
+      monthlyMM: [0, 0.68, 0.32, 0, 0, 0, 0, 0],
+      totalMM: 1.00
+    },
+    {
+      name: "정건모",
+      grade: "초급",
+      role: "D",
+      task: "지표 계산 모듈",
+      residency: "상주",
+      monthlyMM: [0, 0.91, 0.77, 1.00, 0.23, 0, 0, 0],
+      totalMM: 2.91
+    },
+    {
+      name: "이수찬",
+      grade: "초급",
+      role: "TL",
+      task: "시뮬레이션 어댑터",
+      residency: "상주",
+      monthlyMM: [0, 1.00, 0.50, 0, 0, 0, 0, 0],
+      totalMM: 1.50
+    },
+    {
+      name: "장동권",
+      grade: "초급",
+      role: "D",
+      task: "시뮬레이션 어댑터",
+      residency: "상주",
+      monthlyMM: [0, 0, 0.55, 0.18, 0, 0, 0, 0],
+      totalMM: 0.73
+    },
+    {
+      name: "최승옥",
+      grade: "초급",
+      role: "D",
+      task: "시뮬레이션 어댑터",
+      residency: "상주",
+      monthlyMM: [0, 0, 0.18, 0.36, 0.50, 0, 0, 0],
+      totalMM: 1.05
+    },
+    {
+      name: "전현배",
+      grade: "초급",
+      role: "D",
+      task: "시뮬레이션 어댑터",
+      residency: "상주",
+      monthlyMM: [0, 0, 0.18, 0.36, 0.50, 0, 0, 0],
+      totalMM: 1.05
+    }
+  ]
+
+  // 월별 총 MM 계산
+  const totalMonthlyMM = personnelMMData[0].monthlyMM.map((_, monthIndex) => 
+    personnelMMData.reduce((sum, person) => sum + person.monthlyMM[monthIndex], 0)
+  )
+
+  // 각 개인의 총 인건비 계산
+  const personnelTotalCosts = personnelExpenses.map(person => 
+    person.monthlyCosts.reduce((sum, cost) => sum + cost, 0)
+  )
+
+  // 요약 정보
+  const totalSalarySum = totalPersonnelCosts.reduce((sum, cost) => sum + cost, 0)
+  const totalMMSum = personnelMMData.reduce((sum, person) => sum + person.totalMM, 0)
+  const averageCostPerMonth = 7783000
 
   const procurementItems = [
     { item: "서버 인프라", quantity: 1, unitPrice: 5000000, total: 5000000, status: "계약완료" },
@@ -276,59 +425,57 @@ export default function ProjectCostManagement() {
         </Button>
       </div>
 
-      {/* 현재 프로젝트 */}
-      <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
-        <Target className="w-5 h-5 text-primary" />
-        <div>
-          <span className="text-sm text-muted-foreground">현재 프로젝트:</span>
-          <span className="ml-2 text-lg font-semibold">{activeProject.name}</span>
-        </div>
-      </div>
 
 
       {/* 탭 메뉴 */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="profit-loss">손익계산서</TabsTrigger>
-          <TabsTrigger value="effort-allocation">노력 할당</TabsTrigger>
+          <TabsTrigger value="effort-allocation">판관비</TabsTrigger>
           <TabsTrigger value="procurement">조달</TabsTrigger>
         </TabsList>
 
         {/* 손익계산서 탭 */}
         <TabsContent value="profit-loss" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* 수익 */}
+          {/* 요약 정보 */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-green-600">총 수익</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
+                <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
-                  {formatCurrency(profitLossData.revenue)}
+                    {formatCurrency(50000000)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">총 수익</div>
                 </div>
               </CardContent>
             </Card>
-
-            {/* 비용 */}
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-red-600">총 비용</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
+                <div className="text-center">
                 <div className="text-2xl font-bold text-red-600">
-                  {formatCurrency(Object.values(profitLossData.costs).reduce((a, b) => a + b, 0))}
+                    {formatCurrency(40000000)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">총 비용</div>
                 </div>
               </CardContent>
             </Card>
-
-            {/* 이익 */}
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-blue-600">순이익</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
+                <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(profitLossData.profit)}
+                    {formatCurrency(10000000)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">순수익</div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    20%
+                  </div>
+                  <div className="text-sm text-muted-foreground">수익률</div>
                 </div>
               </CardContent>
             </Card>
@@ -345,25 +492,25 @@ export default function ProjectCostManagement() {
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                   <span className="font-medium">인건비</span>
                   <span className="text-red-600 font-semibold">
-                    {formatCurrency(profitLossData.costs.labor)}
+                    {formatCurrency(25000000)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                   <span className="font-medium">자재비</span>
                   <span className="text-red-600 font-semibold">
-                    {formatCurrency(profitLossData.costs.materials)}
+                    {formatCurrency(8000000)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                   <span className="font-medium">간접비</span>
                   <span className="text-red-600 font-semibold">
-                    {formatCurrency(profitLossData.costs.overhead)}
+                    {formatCurrency(5000000)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                   <span className="font-medium">기타 비용</span>
                   <span className="text-red-600 font-semibold">
-                    {formatCurrency(profitLossData.costs.other)}
+                    {formatCurrency(2000000)}
                   </span>
                 </div>
               </div>
@@ -371,44 +518,285 @@ export default function ProjectCostManagement() {
           </Card>
         </TabsContent>
 
-        {/* 노력 할당 탭 */}
+        {/* 판관비 탭 */}
         <TabsContent value="effort-allocation" className="space-y-6">
+          {/* 요약 정보 */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {formatCurrency(totalSalarySum)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">총 급여 합</div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {totalMMSum} MM
+                  </div>
+                  <div className="text-sm text-muted-foreground">총 MM 합</div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {formatCurrency(averageCostPerMonth)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">평균 원가/월</div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 등급별 MM 비용 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="w-5 h-5" />
+                등급별 MM 비용
+              </CardTitle>
+              <CardDescription>직급별 월간 비용 기준을 설정합니다.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 border rounded-lg text-center">
+                  <div className="text-sm text-gray-600 mb-1">특급</div>
+                  <div className="text-lg font-semibold text-blue-600">{formatCurrency(17879000)}</div>
+                </div>
+                <div className="p-4 border rounded-lg text-center">
+                  <div className="text-sm text-gray-600 mb-1">고급</div>
+                  <div className="text-lg font-semibold text-green-600">{formatCurrency(13938000)}</div>
+                </div>
+                <div className="p-4 border rounded-lg text-center">
+                  <div className="text-sm text-gray-600 mb-1">중급</div>
+                  <div className="text-lg font-semibold text-yellow-600">{formatCurrency(10467000)}</div>
+                </div>
+                <div className="p-4 border rounded-lg text-center">
+                  <div className="text-sm text-gray-600 mb-1">초급</div>
+                  <div className="text-lg font-semibold text-orange-600">{formatCurrency(7783000)}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 인건비 관리 */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5" />
-                인력 할당 및 비용
+                인건비 관리
               </CardTitle>
-              <CardDescription>역할별 인력 할당 시간과 비용을 관리합니다.</CardDescription>
+              <CardDescription>개인별 작업 공수(MM)와 인건비를 관리합니다.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-5 gap-4 p-3 bg-gray-50 rounded-lg font-medium text-sm">
-                  <div>역할</div>
-                  <div className="text-center">시간</div>
-                  <div className="text-center">시급</div>
-                  <div className="text-center">총 비용</div>
-                  <div className="text-center">액션</div>
-                </div>
+              <Tabs defaultValue="mm" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="mm">작업 공수 (MM)</TabsTrigger>
+                  <TabsTrigger value="cost">인건비</TabsTrigger>
+                </TabsList>
                 
-                {effortAllocation.map((item, index) => (
-                  <div key={index} className="grid grid-cols-5 gap-4 p-3 border-b border-gray-200 items-center">
-                    <div className="font-medium">{item.role}</div>
-                    <div className="text-center">{item.hours}시간</div>
-                    <div className="text-center">{formatCurrency(item.rate)}</div>
-                    <div className="text-center font-semibold text-red-600">
-                      {formatCurrency(item.total)}
+                {/* 공통 테이블 */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm table-fixed">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left p-3 font-semibold w-20">이름</th>
+                        <th className="text-center p-3 font-semibold w-16">등급</th>
+                        <th className="text-center p-3 font-semibold w-24">계</th>
+                        <th className="text-center p-3 font-semibold w-20">8월</th>
+                        <th className="text-center p-3 font-semibold w-20">9월</th>
+                        <th className="text-center p-3 font-semibold w-20">10월</th>
+                        <th className="text-center p-3 font-semibold w-20">11월</th>
+                        <th className="text-center p-3 font-semibold w-20">12월</th>
+                        <th className="text-center p-3 font-semibold w-20">1월</th>
+                        <th className="text-center p-3 font-semibold w-20">2월</th>
+                        <th className="text-center p-3 font-semibold w-20">3월</th>
+                        <th className="text-center p-3 font-semibold w-32">비고</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* 작업 공수 (MM) 탭 내용 */}
+                      <TabsContent value="mm" className="contents">
+                        {personnelMMData.map((person, index) => (
+                          <tr key={index} className="border-b hover:bg-gray-50">
+                            <td className="p-3 font-medium w-20">{person.name}</td>
+                            <td className="p-3 text-center w-16">
+                              <Badge variant="outline" className="text-xs">
+                                {person.grade}
+                              </Badge>
+                            </td>
+                            <td className="p-3 text-center font-semibold w-24">
+                              {person.totalMM.toFixed(2)}
+                            </td>
+                            {person.monthlyMM.map((mm, monthIndex) => (
+                              <td key={monthIndex} className="p-3 text-center w-20">
+                                {mm > 0 ? mm.toFixed(2) : '-'}
+                              </td>
+                            ))}
+                            <td className="p-3 text-center text-xs text-gray-500 w-32">
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="border-b bg-green-50 font-semibold">
+                          <td className="p-3 w-20">총 MM</td>
+                          <td className="p-3 text-center w-16">-</td>
+                          <td className="p-3 text-center text-green-700 w-24">
+                            {totalMMSum.toFixed(2)}
+                          </td>
+                          {totalMonthlyMM.map((total, index) => (
+                            <td key={index} className="p-3 text-center text-green-700 w-20">
+                              {total > 0 ? total.toFixed(2) : '-'}
+                            </td>
+                          ))}
+                          <td className="p-3 text-center text-xs text-gray-500 w-32">
+                          </td>
+                        </tr>
+                      </TabsContent>
+                      
+                      {/* 인건비 탭 내용 */}
+                      <TabsContent value="cost" className="contents">
+                        {personnelExpenses.map((person, index) => (
+                          <tr key={index} className="border-b hover:bg-gray-50">
+                            <td className="p-3 font-medium w-20">{person.name}</td>
+                            <td className="p-3 text-center w-16">
+                              <Badge variant="outline" className="text-xs">
+                                {person.grade}
+                              </Badge>
+                            </td>
+                            <td className="p-3 text-center font-semibold w-24">
+                              {formatCurrency(personnelTotalCosts[index])}
+                            </td>
+                            {person.monthlyCosts.map((cost, monthIndex) => (
+                              <td key={monthIndex} className="p-3 text-center w-20">
+                                {cost > 0 ? formatCurrency(cost) : '-'}
+                              </td>
+                            ))}
+                            <td className="p-3 text-center text-xs text-gray-500 w-32">
+                              {person.remarks}
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="border-b bg-green-50 font-semibold">
+                          <td className="p-3 w-20">총 인건비</td>
+                          <td className="p-3 text-center w-16">-</td>
+                          <td className="p-3 text-center text-green-700 w-24">
+                            {formatCurrency(totalSalarySum)}
+                          </td>
+                          {totalPersonnelCosts.map((total, index) => (
+                            <td key={index} className="p-3 text-center text-green-700 w-20">
+                              {formatCurrency(total)}
+                            </td>
+                          ))}
+                          <td className="p-3 text-center text-xs text-gray-500 w-32">
+                            4대 보험료 + 퇴직급여충당금 + 제수당 포함
+                          </td>
+                        </tr>
+                      </TabsContent>
+                    </tbody>
+                  </table>
+                </div>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          {/* 4대보험 (회사부담금) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="w-5 h-5" />
+                4대보험 (회사부담금)
+              </CardTitle>
+              <CardDescription>국민연금(4.5%) + 건강보험(3.5%) + 고용보험(1.5%) + 산재보험(1%) = 총 10.5% 부담</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-yellow-50">
+                      <th className="text-left p-3 font-semibold">구분</th>
+                      <th className="text-center p-3 font-semibold">8월</th>
+                      <th className="text-center p-3 font-semibold">9월</th>
+                      <th className="text-center p-3 font-semibold">10월</th>
+                      <th className="text-center p-3 font-semibold">11월</th>
+                      <th className="text-center p-3 font-semibold">12월</th>
+                      <th className="text-center p-3 font-semibold">1월</th>
+                      <th className="text-center p-3 font-semibold">2월</th>
+                      <th className="text-center p-3 font-semibold">3월</th>
+                      <th className="text-center p-3 font-semibold">비고</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b bg-yellow-50">
+                      <td className="p-3 font-medium">4대보험 (회사부담금)</td>
+                      {insuranceCosts.map((cost, index) => (
+                        <td key={index} className="p-3 text-center">
+                          {formatCurrency(cost)}
+                        </td>
+                      ))}
+                      <td className="p-3 text-center text-xs text-gray-500">
+                        국민연금(4.5%) + 건강보험(3.5%) + 고용보험(1.5%) + 산재보험(1%) = 총 10.5% 부담
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
                     </div>
-                    <div className="text-center">
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+            </CardContent>
+          </Card>
+
+          {/* 간접비 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="w-5 h-5" />
+                간접비
+              </CardTitle>
+              <CardDescription>지급수수료, 임차료, 수도광열비, 감가상각 등 간접비를 관리합니다.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-gray-50">
+                      <th className="text-left p-3 font-semibold">구분</th>
+                      <th className="text-center p-3 font-semibold">8월</th>
+                      <th className="text-center p-3 font-semibold">9월</th>
+                      <th className="text-center p-3 font-semibold">10월</th>
+                      <th className="text-center p-3 font-semibold">11월</th>
+                      <th className="text-center p-3 font-semibold">12월</th>
+                      <th className="text-center p-3 font-semibold">1월</th>
+                      <th className="text-center p-3 font-semibold">2월</th>
+                      <th className="text-center p-3 font-semibold">3월</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {indirectCosts.map((cost, index) => (
+                      <tr key={index} className="border-b hover:bg-gray-50">
+                        <td className="p-3 font-medium">{cost.category}</td>
+                        {cost.monthlyValues.map((value, monthIndex) => (
+                          <td key={monthIndex} className="p-3 text-center">
+                            {value === '입력' ? (
+                              <span className="text-gray-400 italic">입력</span>
+                            ) : value === '-' ? (
+                              <span className="text-gray-400">-</span>
+                            ) : (
+                              formatCurrency(value)
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>
+
         </TabsContent>
 
         {/* 조달 탭 */}
@@ -458,52 +846,6 @@ export default function ProjectCostManagement() {
         </TabsContent>
       </Tabs>
 
-      {/* 요약 정보 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(profitLossData.revenue)}
-              </div>
-              <div className="text-sm text-muted-foreground">총 수익</div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(Object.values(profitLossData.costs).reduce((a, b) => a + b, 0))}
-              </div>
-              <div className="text-sm text-muted-foreground">총 비용</div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {formatCurrency(profitLossData.profit)}
-              </div>
-              <div className="text-sm text-muted-foreground">순이익</div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {Math.round((profitLossData.profit / profitLossData.revenue) * 100)}%
-              </div>
-              <div className="text-sm text-muted-foreground">수익률</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* 공유 모달 */}
       <CostManagementShareModal

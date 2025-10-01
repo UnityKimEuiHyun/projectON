@@ -5,7 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { SidebarStateProvider } from "@/hooks/useSidebarState";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { ProjectRouteGuard } from "@/components/ProjectRouteGuard";
 import Layout from "./components/Layout";
 import Index from "./pages/Index";
 import Projects from "./pages/Projects";
@@ -47,9 +49,10 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <SidebarStateProvider>
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/" element={
@@ -69,63 +72,81 @@ const App = () => (
               <Route path="/projects/wbs" element={
                 <ProtectedRoute>
                   <Layout>
-                    <WBSManagement />
+                    <ProjectRouteGuard>
+                      <WBSManagement />
+                    </ProjectRouteGuard>
                   </Layout>
                 </ProtectedRoute>
               } />
               <Route path="/projects/resource" element={
                 <ProtectedRoute>
                   <Layout>
-                    <ResourceManagement />
+                    <ProjectRouteGuard>
+                      <ResourceManagement />
+                    </ProjectRouteGuard>
                   </Layout>
                 </ProtectedRoute>
               } />
               <Route path="/projects/cost" element={
                 <ProtectedRoute>
                   <Layout>
-                    <ProjectCostManagement />
+                    <ProjectRouteGuard>
+                      <ProjectCostManagement />
+                    </ProjectRouteGuard>
                   </Layout>
                 </ProtectedRoute>
               } />
               <Route path="/projects/summary" element={
                 <ProtectedRoute>
                   <Layout>
-                    <ProjectSummary />
+                    <ProjectRouteGuard>
+                      <ProjectSummary />
+                    </ProjectRouteGuard>
                   </Layout>
                 </ProtectedRoute>
               } />
               <Route path="/projects/expense" element={
                 <ProtectedRoute>
                   <Layout>
-                    <AssetManagement />
+                    <ProjectRouteGuard>
+                      <AssetManagement />
+                    </ProjectRouteGuard>
                   </Layout>
                 </ProtectedRoute>
               } />
               <Route path="/projects/daily-report" element={
                 <ProtectedRoute>
                   <Layout>
-                    <DailyReport />
+                    <ProjectRouteGuard>
+                      <DailyReport />
+                    </ProjectRouteGuard>
                   </Layout>
                 </ProtectedRoute>
               } />
               <Route path="/projects/weekly-report" element={
                 <ProtectedRoute>
                   <Layout>
-                    <WeeklyReport />
+                    <ProjectRouteGuard>
+                      <WeeklyReport />
+                    </ProjectRouteGuard>
                   </Layout>
                 </ProtectedRoute>
               } />
               <Route path="/projects/log" element={
                 <ProtectedRoute>
                   <Layout>
-                    <ProjectLog />
+                    <ProjectRouteGuard>
+                      <ProjectLog />
+                    </ProjectRouteGuard>
                   </Layout>
                 </ProtectedRoute>
               } />
               <Route path="/projects/meetings" element={
                 <ProtectedRoute>
                   <Layout>
-                    <Meetings />
+                    <ProjectRouteGuard>
+                      <Meetings />
+                    </ProjectRouteGuard>
                   </Layout>
                 </ProtectedRoute>
               } />
@@ -167,9 +188,10 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+          </SidebarStateProvider>
           </BrowserRouter>
           <ReactQueryDevtools initialIsOpen={false} />
-        </TooltipProvider>
+          </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
   </ErrorBoundary>

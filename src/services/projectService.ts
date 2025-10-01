@@ -88,7 +88,14 @@ export class ProjectService {
     try {
       const { data, error } = await supabase
         .from('projects')
-        .select('*')
+        .select(`
+          *,
+          groups (
+            id,
+            name,
+            description
+          )
+        `)
         .order('created_at', { ascending: false })
 
       console.log('📊 프로젝트 조회 결과:', { data, error })

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -7,9 +7,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus, Edit, Trash2 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus, Edit, Trash2, Users, MapPin, X } from "lucide-react"
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns"
 import { ko } from "date-fns/locale"
+import { getCompanyMembers, getUserCompanies, type Company } from "@/services/companyService"
+import { useSidebarState } from "@/hooks/useSidebarState"
 
 interface Event {
   id: number
@@ -17,6 +20,19 @@ interface Event {
   date: string
   type: "meeting" | "personal"
   description: string
+  attendees?: string[]
+  location?: string
+}
+
+interface CompanyMember {
+  id: string
+  group_id: string
+  user_id: string
+  role: 'owner' | 'admin' | 'member'
+  joined_at: string
+  status: 'active' | 'inactive' | 'pending' | 'suspended'
+  display_name?: string
+  email?: string
 }
 
 const initialEvents: Event[] = [
@@ -25,7 +41,9 @@ const initialEvents: Event[] = [
     title: "프로젝트 킥오프 미팅",
     date: "2024-01-15",
     type: "meeting",
-    description: "새 프로젝트 시작을 위한 킥오프 미팅"
+    description: "새 프로젝트 시작을 위한 킥오프 미팅",
+    attendees: ["김철수", "이영희"],
+    location: "회의실 A"
   },
   {
     id: 2,
@@ -39,14 +57,18 @@ const initialEvents: Event[] = [
     title: "팀 미팅",
     date: "2024-01-20",
     type: "meeting",
-    description: "주간 팀 미팅"
+    description: "주간 팀 미팅",
+    attendees: ["김철수", "이영희", "박민수"],
+    location: "회의실 B"
   },
   {
     id: 4,
     title: "클라이언트 미팅",
     date: "2024-01-25",
     type: "meeting",
-    description: "클라이언트와의 정기 미팅"
+    description: "클라이언트와의 정기 미팅",
+    attendees: ["김철수"],
+    location: "클라이언트 사무실"
   },
   {
     id: 5,
@@ -67,13 +89,80 @@ const Calendar = () => {
     title: "",
     date: "",
     type: "personal" as Event["type"],
-    description: ""
+    description: "",
+    attendees: [] as string[],
+    location: ""
   })
   const [selectedFilter, setSelectedFilter] = useState<"all" | "meeting" | "personal">("all")
+  const [companyMembers, setCompanyMembers] = useState<CompanyMember[]>([])
+  const [attendeeSearch, setAttendeeSearch] = useState("")
+  const [userCompanies, setUserCompanies] = useState<Company[]>([])
+  const [selectedCompanyForCalendar, setSelectedCompanyForCalendar] = useState<Company | null>(null)
+  const { selectedCompany } = useSidebarState()
 
   const monthStart = startOfMonth(currentDate)
   const monthEnd = endOfMonth(currentDate)
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd })
+
+  // 사용자 소속 기업 목록 로드
+  useEffect(() => {
+    const loadUserCompanies = async () => {
+      try {
+        const companies = await getUserCompanies()
+        setUserCompanies(companies)
+        // 기본적으로 첫 번째 기업을 선택
+        if (companies.length > 0) {
+          setSelectedCompanyForCalendar(companies[0])
+        }
+      } catch (error) {
+        console.error('사용자 기업 목록 로드 실패:', error)
+      }
+    }
+    loadUserCompanies()
+  }, [])
+
+  // 선택된 기업의 구성원 목록 로드
+  useEffect(() => {
+    const loadCompanyMembers = async () => {
+      if (selectedCompanyForCalendar?.id) {
+        try {
+          console.log('캘린더에서 선택된 기업 ID:', selectedCompanyForCalendar.id)
+          const members = await getCompanyMembers(selectedCompanyForCalendar.id)
+          console.log('로드된 구성원:', members)
+          setCompanyMembers(members)
+        } catch (error) {
+          console.error('구성원 목록 로드 실패:', error)
+        }
+      } else {
+        console.log('선택된 기업이 없습니다')
+        setCompanyMembers([])
+      }
+    }
+    loadCompanyMembers()
+  }, [selectedCompanyForCalendar])
+
+  // 필터링된 구성원 목록
+  const filteredMembers = companyMembers.filter(member =>
+    member.display_name?.toLowerCase().includes(attendeeSearch.toLowerCase()) ||
+    member.email?.toLowerCase().includes(attendeeSearch.toLowerCase())
+  )
+
+  // 참석자 관리 함수들
+  const handleAttendeeToggle = (memberName: string) => {
+    setEventForm(prev => ({
+      ...prev,
+      attendees: prev.attendees.includes(memberName)
+        ? prev.attendees.filter(name => name !== memberName)
+        : [...prev.attendees, memberName]
+    }))
+  }
+
+  const handleRemoveAttendee = (memberName: string) => {
+    setEventForm(prev => ({
+      ...prev,
+      attendees: prev.attendees.filter(name => name !== memberName)
+    }))
+  }
 
   const getEventsForDate = (date: Date) => {
     let filteredEvents = events.filter(event => 
@@ -106,8 +195,11 @@ const Calendar = () => {
       title: "",
       date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
       type: "personal",
-      description: ""
+      description: "",
+      attendees: [],
+      location: ""
     })
+    setAttendeeSearch("")
     setIsEventModalOpen(true)
   }
 
@@ -117,8 +209,11 @@ const Calendar = () => {
       title: event.title,
       date: event.date,
       type: event.type,
-      description: event.description
+      description: event.description,
+      attendees: event.attendees || [],
+      location: event.location || ""
     })
+    setAttendeeSearch("")
     setIsEventModalOpen(true)
   }
 
@@ -146,8 +241,9 @@ const Calendar = () => {
     }
 
     setIsEventModalOpen(false)
-    setEventForm({ title: "", date: "", type: "personal", description: "" })
+    setEventForm({ title: "", date: "", type: "personal", description: "", attendees: [], location: "" })
     setEditingEvent(null)
+    setAttendeeSearch("")
   }
 
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1))
@@ -309,6 +405,22 @@ const Calendar = () => {
                           <div className="space-y-1 flex-1">
                             <h4 className="font-medium">{event.title}</h4>
                             <p className="text-sm text-muted-foreground">{event.description}</p>
+                            {event.type === "meeting" && (
+                              <div className="space-y-1">
+                                {event.attendees && event.attendees.length > 0 && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Users className="h-3 w-3" />
+                                    <span>{event.attendees.join(", ")}</span>
+                                  </div>
+                                )}
+                                {event.location && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <MapPin className="h-3 w-3" />
+                                    <span>{event.location}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center space-x-2">
                             {getEventTypeBadge(event.type)}
@@ -445,6 +557,106 @@ const Calendar = () => {
                 rows={3}
               />
             </div>
+
+            {/* 미팅 관련 필드들 */}
+            {eventForm.type === "meeting" && (
+              <>
+                {/* 참석자 선택 */}
+                <div className="grid gap-2">
+                  <Label>참석자</Label>
+                  <div className="space-y-2">
+                    {/* 기업 선택 */}
+                    <div className="grid gap-2">
+                      <Label htmlFor="company-select">소속 기업</Label>
+                      <Select
+                        value={selectedCompanyForCalendar?.id || ""}
+                        onValueChange={(value) => {
+                          const company = userCompanies.find(c => c.id === value)
+                          setSelectedCompanyForCalendar(company || null)
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="기업을 선택하세요" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {userCompanies.map((company) => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* 검색 입력 */}
+                    <Input
+                      placeholder="참석자 검색..."
+                      value={attendeeSearch}
+                      onChange={(e) => setAttendeeSearch(e.target.value)}
+                    />
+                    
+                    {/* 선택된 참석자들 */}
+                    {eventForm.attendees.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {eventForm.attendees.map((attendee) => (
+                          <Badge key={attendee} variant="secondary" className="flex items-center gap-1">
+                            {attendee}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveAttendee(attendee)}
+                              className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 구성원 목록 */}
+                    <div className="max-h-32 overflow-y-auto border rounded-md">
+                      {filteredMembers.map((member) => {
+                        const memberName = member.display_name || member.email || 'Unknown'
+                        const isSelected = eventForm.attendees.includes(memberName)
+                        return (
+                          <div key={member.id} className="flex items-center space-x-2 p-2 hover:bg-muted/50">
+                            <Checkbox
+                              id={member.id}
+                              checked={isSelected}
+                              onCheckedChange={() => handleAttendeeToggle(memberName)}
+                            />
+                            <Label htmlFor={member.id} className="flex-1 cursor-pointer">
+                              <div className="text-sm font-medium">{member.display_name || 'Unknown'}</div>
+                              {member.email && (
+                                <div className="text-xs text-muted-foreground">{member.email}</div>
+                              )}
+                            </Label>
+                          </div>
+                        )
+                      })}
+                      {filteredMembers.length === 0 && (
+                        <div className="p-2 text-sm text-muted-foreground text-center">
+                          {!selectedCompanyForCalendar ? "소속 기업을 먼저 선택해주세요" :
+                           attendeeSearch ? "검색 결과가 없습니다" : "구성원이 없습니다"}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 미팅 장소 */}
+                <div className="grid gap-2">
+                  <Label htmlFor="location">미팅 장소</Label>
+                  <Input
+                    id="location"
+                    value={eventForm.location}
+                    onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
+                    placeholder="미팅 장소를 입력하세요"
+                  />
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEventModalOpen(false)}>
