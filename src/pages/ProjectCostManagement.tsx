@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
-import { DollarSign, Share2, BarChart3, PieChart, ChevronRight, Target, Calendar, Package, Plus, X } from "lucide-react"
+import { DollarSign, Share2, BarChart3, PieChart, ChevronRight, Target, Calendar, Package, Plus, X, Settings } from "lucide-react"
 import { CostManagementShareModal } from "@/components/CostManagementShareModal"
 import { canAccessCostManagement } from "@/services/costManagementService"
 import { useAuth } from "@/hooks/useAuth"
@@ -12,6 +12,13 @@ import { supabase } from "@/integrations/supabase/client"
 import type { Database } from "@/integrations/supabase/types"
 
 type Project = Database['public']['Tables']['projects']['Row']
+
+// 열 너비 상수
+const COLUMN_WIDTHS = {
+  category: 'w-20',    // 구분 열 너비
+  item: 'w-40',        // 항목 열 너비
+  summary: 'w-60'      // 요약 섹션 구분 열 너비 (구분 + 항목: w-20 + w-40 = w-60)
+}
 
 interface YearTab {
   id: string
@@ -33,6 +40,8 @@ export default function ProjectCostManagement() {
   const [hasAccess, setHasAccess] = useState(false)
   const [isCheckingAccess, setIsCheckingAccess] = useState(true)
   const [isLoadingProject, setIsLoadingProject] = useState(true)
+  const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState(false)
+  const [yearTabToDelete, setYearTabToDelete] = useState<string | null>(null)
 
   // 공통 월 관리 상태
   const [months, setMonths] = useState([
@@ -49,12 +58,17 @@ export default function ProjectCostManagement() {
   // 월 추가 함수
   const addMonth = () => {
     const newKey = `month_${Date.now()}`
+    
+    // 현재 활성화된 년도 탭의 년도 가져오기
+    const currentYearTab = yearTabs.find(tab => tab.id === activeYearTab)
+    const currentYear = currentYearTab?.year || new Date().getFullYear()
+    
     const newMonthData = {
       key: newKey,
       label: '월 입력',
       value: 'Custom',
       month: 0,
-      year: 0,
+      year: currentYear,
       isEditable: true
     }
     
@@ -191,17 +205,55 @@ export default function ProjectCostManagement() {
     }
     setYearTabs(prev => [...prev, newTab])
     setActiveYearTab(newTab.id)
+    
+    // 새로운 년도에 맞는 월 초기화 (1월부터 12월까지)
+    const newYearMonths = Array.from({ length: 12 }, (_, index) => {
+      const month = index + 1
+      const monthKey = `year${newYear}_month${month}`
+      return {
+        key: monthKey,
+        label: `${month}월`,
+        value: `${month}월-${newYear}`,
+        month: month,
+        year: newYear,
+        isEditable: false
+      }
+    })
+    
+    // 기존 월에 새로운 년도 월 추가
+    setMonths(prev => [...prev, ...newYearMonths])
   }
 
-  // 년도 탭 제거
+  // 년도 탭 제거 확인 모달 표시
+  const confirmRemoveYearTab = (tabId: string) => {
+    if (tabId === "overall") return
+    
+    setYearTabToDelete(tabId)
+    setIsDeleteConfirmModalOpen(true)
+  }
+
+  // 년도 탭 제거 실행
   const removeYearTab = (tabId: string) => {
     if (tabId === "overall") return
     
+    // 제거할 년도 탭의 년도 번호 찾기
+    const yearTabToRemove = yearTabs.find(tab => tab.id === tabId)
+    const yearToRemove = yearTabToRemove?.year
+    
     setYearTabs(prev => prev.filter(tab => tab.id !== tabId))
+    
+    // 해당 년도의 월들도 함께 제거
+    if (yearToRemove) {
+      setMonths(prev => prev.filter(month => month.year !== yearToRemove))
+    }
     
     if (activeYearTab === tabId) {
       setActiveYearTab("overall")
     }
+    
+    // 모달 닫기
+    setIsDeleteConfirmModalOpen(false)
+    setYearTabToDelete(null)
   }
 
   // 탭 변경 핸들러
@@ -213,7 +265,7 @@ export default function ProjectCostManagement() {
 
   const handleSubTabChange = (value: string) => {
     setActiveSubTab(value)
-    setActiveYearTab("overall")
+    // 년도 탭 상태는 유지 (서브 탭 변경 시 리셋하지 않음)
   }
 
   // 로딩 상태
@@ -340,7 +392,7 @@ export default function ProjectCostManagement() {
             onSubTabChange={handleSubTabChange}
             onYearTabChange={setActiveYearTab}
             onAddYearTab={addYearTab}
-            onRemoveYearTab={removeYearTab}
+            onRemoveYearTab={confirmRemoveYearTab}
             months={months}
             onAddMonth={addMonth}
             onRemoveMonth={removeMonth}
@@ -358,7 +410,7 @@ export default function ProjectCostManagement() {
             onSubTabChange={handleSubTabChange}
             onYearTabChange={setActiveYearTab}
             onAddYearTab={addYearTab}
-            onRemoveYearTab={removeYearTab}
+            onRemoveYearTab={confirmRemoveYearTab}
             months={months}
             onAddMonth={addMonth}
             onRemoveMonth={removeMonth}
@@ -377,6 +429,14 @@ export default function ProjectCostManagement() {
         onOpenChange={setIsShareModalOpen}
         projectId={activeProject.id}
         projectName={activeProject.name}
+      />
+
+      {/* 년도 탭 삭제 확인 모달 */}
+      <YearTabDeleteConfirmModal
+        open={isDeleteConfirmModalOpen}
+        onOpenChange={setIsDeleteConfirmModalOpen}
+        yearTabName={yearTabToDelete ? yearTabs.find(tab => tab.id === yearTabToDelete)?.name || '' : ''}
+        onConfirm={() => yearTabToDelete && removeYearTab(yearTabToDelete)}
       />
     </div>
   )
@@ -488,17 +548,19 @@ function PlanContent({
 
         {/* 조달 */}
         <TabsContent value="procurement" className="space-y-6">
-            <Card>
-            <CardHeader>
-              <CardTitle>조달</CardTitle>
-              <CardDescription>장비와 서비스를 조달합니다.</CardDescription>
-              </CardHeader>
-              <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <p>조달 컨텐츠가 여기에 표시됩니다.</p>
-                </div>
-              </CardContent>
-            </Card>
+          <ProcurementContent 
+            activeYearTab={activeYearTab}
+            yearTabs={yearTabs}
+            onYearTabChange={onYearTabChange}
+            onAddYearTab={onAddYearTab}
+            onRemoveYearTab={onRemoveYearTab}
+            isActual={false}
+            months={months}
+            onAddMonth={onAddMonth}
+            onRemoveMonth={onRemoveMonth}
+            onUpdateMonthLabel={onUpdateMonthLabel}
+            onToggleMonthEdit={onToggleMonthEdit}
+          />
         </TabsContent>
       </Tabs>
     </>
@@ -611,17 +673,19 @@ function ActualContent({
 
         {/* 실적 조달 */}
         <TabsContent value="procurement" className="space-y-6">
-            <Card>
-            <CardHeader>
-              <CardTitle>실적 조달</CardTitle>
-              <CardDescription>실제 조달 현황을 관리합니다.</CardDescription>
-              </CardHeader>
-              <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <p>실적 조달 컨텐츠가 여기에 표시됩니다.</p>
-                </div>
-              </CardContent>
-            </Card>
+          <ProcurementContent 
+            activeYearTab={activeYearTab}
+            yearTabs={yearTabs}
+            onYearTabChange={onYearTabChange}
+            onAddYearTab={onAddYearTab}
+            onRemoveYearTab={onRemoveYearTab}
+            isActual={true}
+            months={months}
+            onAddMonth={onAddMonth}
+            onRemoveMonth={onRemoveMonth}
+            onUpdateMonthLabel={onUpdateMonthLabel}
+            onToggleMonthEdit={onToggleMonthEdit}
+          />
         </TabsContent>
       </Tabs>
     </>
@@ -667,48 +731,44 @@ function ProfitLossContent({
     <>
       {/* 3단계 탭 - 분석 기간 */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-4 mb-4">
           <h3 className="text-lg font-semibold text-gray-800">분석 기간</h3>
-          <div className="flex items-center gap-2">
-            <Button 
-              onClick={onAddYearTab}
-              size="sm"
-              variant="outline"
-              className="h-8"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              년도 추가
-            </Button>
-          </div>
+          <Button 
+            onClick={onAddYearTab}
+            size="sm"
+            variant="outline"
+            className="h-8"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            년도 추가
+          </Button>
         </div>
         <Tabs value={activeYearTab} onValueChange={onYearTabChange} className="w-full">
-          <TabsList className="flex flex-wrap gap-2 p-1 bg-muted h-auto">
+          <TabsList className="flex flex-wrap gap-2 p-1 bg-muted h-auto justify-start">
             {yearTabs.map((tab) => (
-              <TabsTrigger 
-                key={tab.id}
-                value={tab.id} 
-                className="text-xs font-medium flex items-center gap-1 h-8 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-              >
-                {tab.id === "overall" ? (
-                  <Target className="w-3 h-3" />
-                ) : (
-                  <Calendar className="w-3 h-3" />
-                )}
-                {tab.name}
+              <div key={tab.id} className="relative flex items-center">
+                <TabsTrigger 
+                  value={tab.id} 
+                  className="text-xs font-medium flex items-center gap-1 h-8 min-w-[100px] pl-3 pr-8 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                >
+                  {tab.id === "overall" ? (
+                    <Target className="w-3 h-3" />
+                  ) : (
+                    <Calendar className="w-3 h-3" />
+                  )}
+                  {tab.name}
+                </TabsTrigger>
                 {tab.id !== "overall" && (
                   <Button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onRemoveYearTab(tab.id)
-                    }}
+                    onClick={() => onRemoveYearTab(tab.id)}
                     size="sm"
                     variant="ghost"
-                    className="h-4 w-4 p-0 ml-1 hover:bg-red-100 hover:text-red-600"
+                    className="absolute top-1/2 -translate-y-1/2 right-1 h-4 w-4 p-0 hover:bg-red-100 hover:text-red-600 z-10"
                   >
                     <X className="w-3 h-3" />
                   </Button>
                 )}
-              </TabsTrigger>
+              </div>
             ))}
           </TabsList>
         </Tabs>
@@ -764,11 +824,11 @@ function OverallProfitLossContent({ isActual, yearTabs }: OverallProfitLossConte
             <div className="text-2xl font-bold text-green-600">{totalRevenue.toLocaleString()}원</div>
               </CardContent>
             </Card>
-        <Card>
-          <CardHeader className="pb-2">
+            <Card>
+              <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">총 비용</CardTitle>
-          </CardHeader>
-          <CardContent>
+              </CardHeader>
+              <CardContent>
             <div className="text-2xl font-bold text-red-600">{totalCost.toLocaleString()}원</div>
           </CardContent>
         </Card>
@@ -779,14 +839,14 @@ function OverallProfitLossContent({ isActual, yearTabs }: OverallProfitLossConte
           <CardContent>
             <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {netProfit.toLocaleString()}원
-          </div>
-          </CardContent>
-        </Card>
-          <Card>
-          <CardHeader className="pb-2">
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">수익률</CardTitle>
-            </CardHeader>
-            <CardContent>
+              </CardHeader>
+              <CardContent>
             <div className={`text-2xl font-bold ${parseFloat(profitMargin) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {profitMargin}%
                 </div>
@@ -839,15 +899,17 @@ function YearProfitLossContent({
   onUpdateMonthLabel, 
   onToggleMonthEdit 
 }: YearProfitLossContentProps) {
+  // 해당 년도의 월만 필터링
+  const yearMonths = months.filter(month => month.year === yearTab.year)
 
   return (
     <div className="space-y-6">
-      {/* 수익 섹션 */}
+      {/* 요약 섹션 */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>수익</CardTitle>
+              <CardTitle>요약</CardTitle>
               <CardDescription>월별 수익을 입력합니다.</CardDescription>
                 </div>
             <div className="flex items-center gap-2">
@@ -868,10 +930,9 @@ function YearProfitLossContent({
             <table className="w-full border-collapse table-fixed">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left p-2 font-medium">구분</th>
-                  <th className="text-left p-2 font-medium">항목</th>
+                  <th className={`text-left p-2 font-medium ${COLUMN_WIDTHS.summary}`}>구분</th>
                   <th className="text-center p-2 font-medium">계</th>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <th key={month.key} className="text-center p-2 font-medium text-xs">
                       <div className="flex items-center justify-center gap-1">
                         {month.isEditable ? (
@@ -879,6 +940,7 @@ function YearProfitLossContent({
                             type="text"
                             defaultValue={month.label}
                             className="w-16 px-1 py-0.5 text-xs text-center border rounded text-blue-600 font-medium"
+                            onFocus={(e) => e.target.select()}
                             onBlur={(e) => onUpdateMonthLabel(month.key, e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
@@ -895,7 +957,7 @@ function YearProfitLossContent({
                             {month.label}
                   </span>
                         )}
-                        {months.length > 1 && (
+                        {yearMonths.length > 1 && (
                           <Button
                             onClick={() => onRemoveMonth(month.key)}
                             size="sm"
@@ -912,10 +974,9 @@ function YearProfitLossContent({
               </thead>
               <tbody>
                 <tr className="border-b">
-                  <td className="p-2 text-sm font-medium" rowSpan={3}>수익</td>
-                  <td className="p-2 text-sm">프로젝트 수익</td>
+                  <td className={`p-2 text-sm font-medium ${COLUMN_WIDTHS.summary}`}>매출</td>
                   <td className="p-2 text-sm text-center font-medium bg-green-50">-</td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-center">
                       <input
                         type="number"
@@ -926,9 +987,9 @@ function YearProfitLossContent({
                   ))}
                 </tr>
                 <tr className="border-b">
-                  <td className="p-2 text-sm">기타 수익</td>
+                  <td className={`p-2 text-sm font-medium ${COLUMN_WIDTHS.summary}`}>수금</td>
                   <td className="p-2 text-sm text-center font-medium bg-green-50">-</td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-center">
                       <input
                         type="number"
@@ -938,11 +999,17 @@ function YearProfitLossContent({
                     </td>
                   ))}
                 </tr>
-                <tr className="border-b bg-green-50">
-                  <td className="p-2 text-sm font-medium">총 수익</td>
-                  <td className="p-2 text-sm text-center font-medium">-</td>
-                  {months.map((month) => (
-                    <td key={month.key} className="p-2 text-sm text-center font-medium">-</td>
+                <tr className="border-b">
+                  <td className={`p-2 text-sm font-medium ${COLUMN_WIDTHS.summary}`}>원가</td>
+                  <td className="p-2 text-sm text-center font-medium bg-green-50">-</td>
+                  {yearMonths.map((month) => (
+                    <td key={month.key} className="p-2 text-center">
+                      <input
+                        type="number"
+                        className="w-20 px-1 py-0.5 text-right text-xs border rounded text-blue-600 font-medium"
+                        placeholder="입력"
+                      />
+                    </td>
                   ))}
                 </tr>
               </tbody>
@@ -951,25 +1018,25 @@ function YearProfitLossContent({
             </CardContent>
           </Card>
 
-      {/* 비용 섹션 */}
+      {/* 상세 비용 섹션 */}
           <Card>
             <CardHeader>
-          <CardTitle>비용</CardTitle>
-          <CardDescription>월별 비용을 입력합니다.</CardDescription>
+          <CardTitle>상세 비용</CardTitle>
+          <CardDescription>판관비에서 자동으로 계산된 값입니다.</CardDescription>
             </CardHeader>
             <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse table-fixed">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left p-2 font-medium">구분</th>
-                  <th className="text-left p-2 font-medium">항목</th>
+                  <th className={`text-left p-2 font-medium ${COLUMN_WIDTHS.category}`}>구분</th>
+                  <th className={`text-left p-2 font-medium ${COLUMN_WIDTHS.item}`}>항목</th>
                   <th className="text-center p-2 font-medium">계</th>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <th key={month.key} className="text-center p-2 font-medium text-xs">
                       <div className="flex items-center justify-center gap-1">
                         <span>{month.label}</span>
-                        {months.length > 1 && (
+                        {yearMonths.length > 1 && (
                           <Button
                             onClick={() => onRemoveMonth(month.key)}
                             size="sm"
@@ -979,123 +1046,109 @@ function YearProfitLossContent({
                             <X className="w-3 h-3" />
                       </Button>
                         )}
-                    </div>
+                </div>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 <tr className="border-b">
-                  <td className="p-2 text-sm font-medium" rowSpan={4}>직접비</td>
-                  <td className="p-2 text-sm">인건비</td>
+                  <td className={`p-2 text-sm font-medium ${COLUMN_WIDTHS.category}`} rowSpan={4}>직접비</td>
+                  <td className={`p-2 text-sm ${COLUMN_WIDTHS.item}`}>인건비</td>
                   <td className="p-2 text-sm text-center font-medium bg-green-50">-</td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-center">
-                      <input
-                        type="number"
-                        className="w-20 px-1 py-0.5 text-right text-xs border rounded text-blue-600 font-medium"
-                        placeholder="입력"
-                      />
+                      <div className="w-20 px-1 py-0.5 text-center text-xs text-gray-600 font-medium bg-gray-50 rounded mx-auto">
+                        판관비 연동
+                      </div>
                     </td>
                   ))}
                 </tr>
                 <tr className="border-b">
-                  <td className="p-2 text-sm">4대보험</td>
+                  <td className={`p-2 text-sm ${COLUMN_WIDTHS.item}`}>4대보험</td>
                   <td className="p-2 text-sm text-center font-medium bg-green-50">-</td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-center">
-                      <input
-                        type="number"
-                        className="w-20 px-1 py-0.5 text-right text-xs border rounded text-blue-600 font-medium"
-                        placeholder="입력"
-                      />
+                      <div className="w-20 px-1 py-0.5 text-center text-xs text-gray-600 font-medium bg-gray-50 rounded mx-auto">
+                        판관비 연동
+                      </div>
                     </td>
                   ))}
                 </tr>
                 <tr className="border-b">
-                  <td className="p-2 text-sm">기타 직접비</td>
+                  <td className={`p-2 text-sm ${COLUMN_WIDTHS.item}`}>기타 직접비</td>
                   <td className="p-2 text-sm text-center font-medium bg-green-50">-</td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-center">
-                      <input
-                        type="number"
-                        className="w-20 px-1 py-0.5 text-right text-xs border rounded text-blue-600 font-medium"
-                        placeholder="입력"
-                      />
+                      <div className="w-20 px-1 py-0.5 text-center text-xs text-gray-600 font-medium bg-gray-50 rounded mx-auto">
+                        판관비 연동
+                      </div>
                     </td>
                   ))}
                 </tr>
                 <tr className="border-b bg-green-50">
-                  <td className="p-2 text-sm font-medium">총 직접비</td>
+                  <td className={`p-2 text-sm font-medium ${COLUMN_WIDTHS.item}`}>총 직접비</td>
                   <td className="p-2 text-sm text-center font-medium">-</td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-sm text-center font-medium">-</td>
                   ))}
                 </tr>
                 <tr className="border-b">
-                  <td className="p-2 text-sm font-medium" rowSpan={5}>간접비</td>
-                  <td className="p-2 text-sm">지급수수료</td>
+                  <td className={`p-2 text-sm font-medium ${COLUMN_WIDTHS.category}`} rowSpan={5}>간접비</td>
+                  <td className={`p-2 text-sm ${COLUMN_WIDTHS.item}`}>지급수수료</td>
                   <td className="p-2 text-sm text-center font-medium bg-green-50">-</td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-center">
-                      <input
-                        type="number"
-                        className="w-20 px-1 py-0.5 text-right text-xs border rounded text-blue-600 font-medium"
-                        placeholder="입력"
-                      />
+                      <div className="w-20 px-1 py-0.5 text-center text-xs text-gray-600 font-medium bg-gray-50 rounded mx-auto">
+                        판관비 연동
+                      </div>
                     </td>
                   ))}
                 </tr>
                 <tr className="border-b">
-                  <td className="p-2 text-sm">지급임차료</td>
+                  <td className={`p-2 text-sm ${COLUMN_WIDTHS.item}`}>지급임차료</td>
                   <td className="p-2 text-sm text-center font-medium bg-green-50">-</td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-center">
-                      <input
-                        type="number"
-                        className="w-20 px-1 py-0.5 text-right text-xs border rounded text-blue-600 font-medium"
-                        placeholder="입력"
-                      />
+                      <div className="w-20 px-1 py-0.5 text-center text-xs text-gray-600 font-medium bg-gray-50 rounded mx-auto">
+                        판관비 연동
+                      </div>
                     </td>
                   ))}
                 </tr>
                 <tr className="border-b">
-                  <td className="p-2 text-sm">수도광열비</td>
+                  <td className={`p-2 text-sm ${COLUMN_WIDTHS.item}`}>수도광열비</td>
                   <td className="p-2 text-sm text-center font-medium bg-green-50">-</td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-center">
-                      <input
-                        type="number"
-                        className="w-20 px-1 py-0.5 text-right text-xs border rounded text-blue-600 font-medium"
-                        placeholder="입력"
-                      />
+                      <div className="w-20 px-1 py-0.5 text-center text-xs text-gray-600 font-medium bg-gray-50 rounded mx-auto">
+                        판관비 연동
+                      </div>
                     </td>
                   ))}
                 </tr>
                 <tr className="border-b">
-                  <td className="p-2 text-sm">감가상각</td>
+                  <td className={`p-2 text-sm ${COLUMN_WIDTHS.item}`}>감가상각</td>
                   <td className="p-2 text-sm text-center font-medium bg-green-50">-</td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-center">
-                      <input
-                        type="number"
-                        className="w-20 px-1 py-0.5 text-right text-xs border rounded text-blue-600 font-medium"
-                        placeholder="입력"
-                      />
+                      <div className="w-20 px-1 py-0.5 text-center text-xs text-gray-600 font-medium bg-gray-50 rounded mx-auto">
+                        판관비 연동
+                      </div>
                     </td>
                   ))}
                 </tr>
                 <tr className="border-b bg-green-50">
-                  <td className="p-2 text-sm font-medium">총 간접비</td>
+                  <td className={`p-2 text-sm font-medium ${COLUMN_WIDTHS.item}`}>총 간접비</td>
                   <td className="p-2 text-sm text-center font-medium">-</td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-sm text-center font-medium">-</td>
                   ))}
                 </tr>
                 <tr className="border-b bg-red-50">
                   <td className="p-2 text-sm font-medium" colSpan={2}>총 비용</td>
                   <td className="p-2 text-sm text-center font-medium">-</td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-sm text-center font-medium">-</td>
                   ))}
                 </tr>
@@ -1139,7 +1192,7 @@ function YearProfitLossContent({
             <div className="text-2xl font-bold text-green-600">-</div>
           </CardContent>
         </Card>
-                </div>
+                    </div>
                     </div>
   )
 }
@@ -1183,49 +1236,45 @@ function EffortAllocationContent({
     <>
       {/* 3단계 탭 - 관리 기간 */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-4 mb-4">
           <h3 className="text-lg font-semibold text-gray-800">관리 기간</h3>
-          <div className="flex items-center gap-2">
-            <Button 
-              onClick={onAddYearTab}
-              size="sm"
-              variant="outline"
-              className="h-8"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              년도 추가
+          <Button 
+            onClick={onAddYearTab}
+            size="sm"
+            variant="outline"
+            className="h-8"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            년도 추가
                       </Button>
                     </div>
-                  </div>
         <Tabs value={activeYearTab} onValueChange={onYearTabChange} className="w-full">
-          <TabsList className="flex flex-wrap gap-2 p-1 bg-muted h-auto">
+          <TabsList className="flex flex-wrap gap-2 p-1 bg-muted h-auto justify-start">
             {yearTabs.map((tab) => (
-              <TabsTrigger 
-                key={tab.id}
-                value={tab.id} 
-                className="text-xs font-medium flex items-center gap-1 h-8 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-              >
-                {tab.id === "overall" ? (
-                  <Target className="w-3 h-3" />
-                ) : (
-                  <Calendar className="w-3 h-3" />
-                )}
-                {tab.name}
+              <div key={tab.id} className="relative flex items-center">
+                <TabsTrigger 
+                  value={tab.id} 
+                  className="text-xs font-medium flex items-center gap-1 h-8 min-w-[100px] pl-3 pr-8 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                >
+                  {tab.id === "overall" ? (
+                    <Target className="w-3 h-3" />
+                  ) : (
+                    <Calendar className="w-3 h-3" />
+                  )}
+                  {tab.name}
+                </TabsTrigger>
                 {tab.id !== "overall" && (
                   <Button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onRemoveYearTab(tab.id)
-                    }}
+                    onClick={() => onRemoveYearTab(tab.id)}
                     size="sm"
                     variant="ghost"
-                    className="h-4 w-4 p-0 ml-1 hover:bg-red-100 hover:text-red-600"
+                    className="absolute top-1/2 -translate-y-1/2 right-1 h-4 w-4 p-0 hover:bg-red-100 hover:text-red-600 z-10"
                   >
                     <X className="w-3 h-3" />
                   </Button>
                 )}
-              </TabsTrigger>
-            ))}
+                  </div>
+                ))}
           </TabsList>
         </Tabs>
         <Separator className="my-3" />
@@ -1308,7 +1357,7 @@ function OverallEffortAllocationContent({ isActual, yearTabs }: OverallEffortAll
             <CardContent>
           <div className="text-center py-8 text-muted-foreground">
             <p>전체 판관비 데이터는 각 년도별 데이터를 연산하여 계산됩니다.</p>
-            </div>
+                </div>
           </CardContent>
         </Card>
     </div>
@@ -1342,6 +1391,8 @@ function YearEffortAllocationContent({
   onUpdateMonthLabel, 
   onToggleMonthEdit 
 }: YearEffortAllocationContentProps) {
+  // 해당 년도의 월만 필터링
+  const yearMonths = months.filter(month => month.year === yearTab.year)
 
   // 인건비 데이터 (사용자 입력)
   const personnelData = [
@@ -1355,12 +1406,15 @@ function YearEffortAllocationContent({
   ]
 
   // 등급별 MM 비용 (사용자 입력)
-  const gradeCosts = [
+  const [gradeCosts, setGradeCosts] = useState([
     { grade: '특급', cost: 17879000 },
     { grade: '고급', cost: 13938000 },
     { grade: '중급', cost: 10467000 },
     { grade: '초급', cost: 7783000 }
-  ]
+  ])
+
+  // 등급 설정 모달 상태
+  const [isGradeCostModalOpen, setIsGradeCostModalOpen] = useState(false)
 
   // 등급에 따른 단가 계산 함수
   const getGradeCost = (grade: string) => {
@@ -1460,31 +1514,13 @@ function YearEffortAllocationContent({
 
   return (
     <div className="space-y-6">
-      {/* 등급별 MM 비용 */}
-        <Card>
-        <CardHeader>
-          <CardTitle>등급별 MM 비용</CardTitle>
-          <CardDescription>각 등급별 월간 비용을 설정합니다.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            {gradeCosts.map((grade) => (
-              <div key={grade.grade} className="flex items-center justify-between p-3 border rounded-lg">
-                <span className="font-medium">{grade.grade}</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    defaultValue={grade.cost}
-                    className="w-32 px-2 py-1 text-right border rounded text-blue-600 font-medium"
-                    placeholder="입력"
-                  />
-                  <span className="text-sm text-muted-foreground">원</span>
-              </div>
-                    </div>
-            ))}
-            </div>
-          </CardContent>
-        </Card>
+      {/* 등급별 MM 비용 모달 상태 */}
+      <GradeCostModal 
+        open={isGradeCostModalOpen}
+        onOpenChange={setIsGradeCostModalOpen}
+        gradeCosts={gradeCosts}
+        onGradeCostsChange={setGradeCosts}
+      />
         
       {/* 인건비 관리 */}
         <Card>
@@ -1493,8 +1529,17 @@ function YearEffortAllocationContent({
             <div>
               <CardTitle>인건비 관리</CardTitle>
               <CardDescription>개인별 월간 인건비를 관리합니다.</CardDescription>
-              </div>
+                    </div>
             <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setIsGradeCostModalOpen(true)}
+                size="sm"
+                variant="outline"
+                className="h-8"
+              >
+                <Settings className="w-4 h-4 mr-1" />
+                등급 설정
+              </Button>
               <Button
                 onClick={onAddMonth}
                 size="sm"
@@ -1504,7 +1549,7 @@ function YearEffortAllocationContent({
                 <Plus className="w-4 h-4 mr-1" />
                 월 추가
               </Button>
-            </div>
+                    </div>
                   </div>
         </CardHeader>
         <CardContent>
@@ -1527,7 +1572,7 @@ function YearEffortAllocationContent({
                       <th className={`text-left p-2 font-medium ${COLUMN_WIDTHS.grade}`}>등급</th>
                       <th className={`text-left p-2 font-medium ${COLUMN_WIDTHS.unitCost}`}></th>
                       <th className={`text-center p-2 font-medium ${COLUMN_WIDTHS.total}`}>계</th>
-                      {months.map((month) => (
+                      {yearMonths.map((month) => (
                         <th key={month.key} className="text-center p-2 font-medium text-xs">
                           <div className="flex items-center justify-center gap-1">
                             {month.isEditable ? (
@@ -1551,7 +1596,7 @@ function YearEffortAllocationContent({
                                 {month.label}
                               </span>
                             )}
-                            {months.length > 1 && (
+                            {yearMonths.length > 1 && (
                               <Button
                                 onClick={() => onRemoveMonth(month.key)}
                                 size="sm"
@@ -1559,9 +1604,9 @@ function YearEffortAllocationContent({
                                 className="h-4 w-4 p-0 hover:bg-red-100 hover:text-red-600"
                               >
                                 <X className="w-3 h-3" />
-                              </Button>
+                      </Button>
                             )}
-                          </div>
+                    </div>
                         </th>
                       ))}
                       <th className="text-left p-2 font-medium">비고</th>
@@ -1591,7 +1636,7 @@ function YearEffortAllocationContent({
                         <td className={`p-2 text-sm text-center font-medium bg-green-50 ${COLUMN_WIDTHS.total}`}>
                           -
                         </td>
-                        {months.map((month) => (
+                        {yearMonths.map((month) => (
                           <td key={month.key} className="p-2 border-l border-gray-200 text-center">
                             <input
                               type="number"
@@ -1634,14 +1679,44 @@ function YearEffortAllocationContent({
                       <tr className="border-b bg-green-50">
                         <td className="p-2 text-sm font-medium" colSpan={6}>작업공수</td>
                         <td className={`p-2 text-sm text-center font-medium ${COLUMN_WIDTHS.total}`}>-</td>
-                      {months.map((month) => (
+                      {yearMonths.map((month) => (
                         <td key={month.key} className="p-2 text-sm text-center font-medium border-l border-gray-200">-</td>
+                      ))}
+                      <td className="p-2 text-sm">-</td>
+                    </tr>
+                    {/* 4대보험 회사부담금 행 */}
+                      <tr className="border-b bg-green-50">
+                        <td className="p-2 text-sm font-medium" colSpan={6}>4대보험 (회사부담금)</td>
+                        <td className={`p-2 text-sm text-center font-medium ${COLUMN_WIDTHS.total}`}>-</td>
+                      {yearMonths.map((month) => (
+                        <td key={month.key} className="p-2 text-center border-l border-gray-200">
+                          <input
+                            type="number"
+                            className="w-20 px-1 py-0.5 text-center text-xs border rounded text-blue-600 font-medium"
+                            placeholder="입력"
+                          />
+                        </td>
+                      ))}
+                      <td className="p-2 text-sm">-</td>
+                    </tr>
+                    {/* 기타 직접비 행 */}
+                      <tr className="border-b bg-green-50">
+                        <td className="p-2 text-sm font-medium" colSpan={6}>기타 직접비</td>
+                        <td className={`p-2 text-sm text-center font-medium ${COLUMN_WIDTHS.total}`}>-</td>
+                      {yearMonths.map((month) => (
+                        <td key={month.key} className="p-2 text-center border-l border-gray-200">
+                          <input
+                            type="number"
+                            className="w-20 px-1 py-0.5 text-center text-xs border rounded text-blue-600 font-medium"
+                            placeholder="입력"
+                          />
+                        </td>
                       ))}
                       <td className="p-2 text-sm">-</td>
                     </tr>
                   </tbody>
                 </table>
-              </div>
+                  </div>
         </TabsContent>
             
             {/* 인건비 탭 */}
@@ -1657,7 +1732,7 @@ function YearEffortAllocationContent({
                       <th className={`text-left p-2 font-medium ${COLUMN_WIDTHS.grade}`}>등급</th>
                       <th className={`text-left p-2 font-medium ${COLUMN_WIDTHS.unitCost}`}>단가(원)</th>
                       <th className={`text-center p-2 font-medium ${COLUMN_WIDTHS.total}`}>계</th>
-                      {months.map((month) => (
+                      {yearMonths.map((month) => (
                         <th key={month.key} className="text-center p-2 font-medium text-xs">
                           <div className="flex items-center justify-center gap-1">
                             {month.isEditable ? (
@@ -1681,7 +1756,7 @@ function YearEffortAllocationContent({
                                 {month.label}
                               </span>
                             )}
-                            {months.length > 1 && (
+                            {yearMonths.length > 1 && (
                               <Button
                                 onClick={() => onRemoveMonth(month.key)}
                                 size="sm"
@@ -1691,7 +1766,7 @@ function YearEffortAllocationContent({
                                 <X className="w-3 h-3" />
                               </Button>
                             )}
-                          </div>
+              </div>
                         </th>
                       ))}
                       <th className="text-left p-2 font-medium">비고</th>
@@ -1722,7 +1797,7 @@ function YearEffortAllocationContent({
                         <td className={`p-2 text-sm text-center font-medium bg-green-50 ${COLUMN_WIDTHS.total}`}>
                           -
                         </td>
-                        {months.map((month) => (
+                        {yearMonths.map((month) => (
                           <td key={month.key} className="p-2 text-right text-xs font-medium text-green-600 border-l border-gray-200">
                             {calculatePersonnelCost(index, month.key)}원
                           </td>
@@ -1740,7 +1815,7 @@ function YearEffortAllocationContent({
                       <tr className="border-b bg-green-50">
                         <td className="p-2 text-sm font-medium" colSpan={6}>인건비</td>
                         <td className={`p-2 text-sm text-center font-medium ${COLUMN_WIDTHS.total}`}>-</td>
-                      {months.map((month) => {
+                      {yearMonths.map((month) => {
                         const totalCost = personnelData.reduce((sum, person, personIndex) => {
                           const mmValue = workloadValues[personIndex]?.[month.key] || 0
                           const grade = personGrades[personIndex] || person.grade
@@ -1760,31 +1835,40 @@ function YearEffortAllocationContent({
                       <tr className="border-b bg-green-50">
                         <td className="p-2 text-sm font-medium" colSpan={6}>4대보험 (회사부담금)</td>
                         <td className={`p-2 text-sm text-center font-medium ${COLUMN_WIDTHS.total}`}>-</td>
-                      {months.map((month) => {
-                        const totalCost = personnelData.reduce((sum, person, personIndex) => {
-                          const mmValue = workloadValues[personIndex]?.[month.key] || 0
-                          const grade = personGrades[personIndex] || person.grade
-                          const gradeCost = gradeCosts.find(gc => gc.grade === grade)
-                          const unitCost = gradeCost ? gradeCost.cost : 0
-                          return sum + (mmValue * unitCost)
-                        }, 0)
-                        const insuranceCost = Math.round(totalCost * 0.1) // 인건비의 10%
-                        return (
-                          <td key={month.key} className="p-2 text-sm text-center font-medium text-green-600 border-l border-gray-200">
-                            {insuranceCost.toLocaleString()}원
-                          </td>
-                        )
-                      })}
+                      {yearMonths.map((month) => (
+                        <td key={month.key} className="p-2 text-center border-l border-gray-200">
+                          <input
+                            type="number"
+                            className="w-20 px-1 py-0.5 text-center text-xs border rounded text-blue-600 font-medium"
+                            placeholder="입력"
+                          />
+                        </td>
+                      ))}
+                      <td className="p-2 text-sm">-</td>
+                    </tr>
+                    {/* 기타 직접비 행 */}
+                      <tr className="border-b bg-green-50">
+                        <td className="p-2 text-sm font-medium" colSpan={6}>기타 직접비</td>
+                        <td className={`p-2 text-sm text-center font-medium ${COLUMN_WIDTHS.total}`}>-</td>
+                      {yearMonths.map((month) => (
+                        <td key={month.key} className="p-2 text-center border-l border-gray-200">
+                          <input
+                            type="number"
+                            className="w-20 px-1 py-0.5 text-center text-xs border rounded text-blue-600 font-medium"
+                            placeholder="입력"
+                          />
+                        </td>
+                      ))}
                       <td className="p-2 text-sm">-</td>
                     </tr>
                   </tbody>
                 </table>
-            </div>
-            </TabsContent>
-          </Tabs>
+              </div>
+        </TabsContent>
+      </Tabs>
           </CardContent>
         </Card>
-        
+
       {/* 간접비 관리 */}
         <Card>
         <CardHeader>
@@ -1814,7 +1898,7 @@ function YearEffortAllocationContent({
                   <th className="text-left p-2 font-medium">구분</th>
                   <th className="text-left p-2 font-medium"></th>
                   <th className="text-center p-2 font-medium">계</th>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <th key={month.key} className="text-center p-2 font-medium text-xs">
                       <div className="flex items-center justify-center gap-1">
                         {month.isEditable ? (
@@ -1822,6 +1906,7 @@ function YearEffortAllocationContent({
                             type="text"
                             defaultValue={month.label}
                             className="w-16 px-1 py-0.5 text-xs text-center border rounded text-blue-600 font-medium"
+                            onFocus={(e) => e.target.select()}
                             onBlur={(e) => onUpdateMonthLabel(month.key, e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
@@ -1838,7 +1923,7 @@ function YearEffortAllocationContent({
                             {month.label}
                           </span>
                         )}
-                        {months.length > 1 && (
+                        {yearMonths.length > 1 && (
                           <Button
                             onClick={() => onRemoveMonth(month.key)}
                             size="sm"
@@ -1860,7 +1945,7 @@ function YearEffortAllocationContent({
                   <td className="p-2 text-sm text-center font-medium bg-green-50">
                     {Object.values(indirectCosts['지급수수료'] || {}).reduce((sum, value) => sum + value, 0).toLocaleString()}원
                   </td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-center">
                       <input
                         type="number"
@@ -1878,7 +1963,7 @@ function YearEffortAllocationContent({
                   <td className="p-2 text-sm text-center font-medium bg-green-50">
                     {Object.values(indirectCosts['지급임차료'] || {}).reduce((sum, value) => sum + value, 0).toLocaleString()}원
                   </td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-center">
                       <input
                         type="number"
@@ -1896,7 +1981,7 @@ function YearEffortAllocationContent({
                   <td className="p-2 text-sm text-center font-medium bg-green-50">
                     {Object.values(indirectCosts['수도광열비'] || {}).reduce((sum, value) => sum + value, 0).toLocaleString()}원
                   </td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-center">
                       <input
                         type="number"
@@ -1914,7 +1999,7 @@ function YearEffortAllocationContent({
                   <td className="p-2 text-sm text-center font-medium bg-green-50">
                     {Object.values(indirectCosts['감가상각'] || {}).reduce((sum, value) => sum + value, 0).toLocaleString()}원
                   </td>
-                  {months.map((month) => (
+                  {yearMonths.map((month) => (
                     <td key={month.key} className="p-2 text-center">
                       <input
                         type="number"
@@ -1930,9 +2015,9 @@ function YearEffortAllocationContent({
                 <tr className="border-b bg-green-50">
                   <td className="p-2 text-sm font-medium">공통비계</td>
                   <td className="p-2 text-sm text-center font-medium text-green-600">
-                    {months.reduce((total, month) => total + calculateTotalIndirectCost(month.key), 0).toLocaleString()}원
+                    {yearMonths.reduce((total, month) => total + calculateTotalIndirectCost(month.key), 0).toLocaleString()}원
                   </td>
-                  {months.map((month) => {
+                  {yearMonths.map((month) => {
                     const totalCost = calculateTotalIndirectCost(month.key)
                     return (
                       <td key={month.key} className="p-2 text-sm text-center font-medium text-green-600">
@@ -1973,6 +2058,399 @@ function YearEffortAllocationContent({
             <div className="text-2xl font-bold text-green-600">-</div>
           </CardContent>
         </Card>
+              </div>
+            </div>
+  )
+}
+
+// 조달 컨텐츠 컴포넌트
+interface ProcurementContentProps {
+  activeYearTab: string
+  yearTabs: YearTab[]
+  onYearTabChange: (value: string) => void
+  onAddYearTab: () => void
+  onRemoveYearTab: (tabId: string) => void
+  isActual: boolean
+  months: Array<{
+    key: string
+    label: string
+    value: string
+    month: number
+    year: number
+    isEditable: boolean
+  }>
+  onAddMonth: () => void
+  onRemoveMonth: (monthKey: string) => void
+  onUpdateMonthLabel: (monthKey: string, newLabel: string) => void
+  onToggleMonthEdit: (monthKey: string) => void
+}
+
+function ProcurementContent({
+  activeYearTab,
+  yearTabs,
+  onYearTabChange,
+  onAddYearTab,
+  onRemoveYearTab,
+  isActual,
+  months,
+  onAddMonth,
+  onRemoveMonth,
+  onUpdateMonthLabel,
+  onToggleMonthEdit
+}: ProcurementContentProps) {
+  return (
+    <>
+      {/* 3단계 탭 - 관리 기간 */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-4 mb-4">
+          <h3 className="text-lg font-semibold text-gray-800">관리 기간</h3>
+          <Button 
+            onClick={onAddYearTab}
+            size="sm"
+            variant="outline"
+            className="h-8"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            년도 추가
+          </Button>
+        </div>
+        <Tabs value={activeYearTab} onValueChange={onYearTabChange} className="w-full">
+          <TabsList className="flex flex-wrap gap-2 p-1 bg-muted h-auto justify-start">
+            {yearTabs.map((tab) => (
+              <div key={tab.id} className="relative flex items-center">
+                <TabsTrigger 
+                  value={tab.id} 
+                  className="text-xs font-medium flex items-center gap-1 h-8 min-w-[100px] pl-3 pr-8 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                >
+                  {tab.id === "overall" ? (
+                    <Target className="w-3 h-3" />
+                  ) : (
+                    <Calendar className="w-3 h-3" />
+                  )}
+                  {tab.name}
+                </TabsTrigger>
+                {tab.id !== "overall" && (
+                  <Button
+                    onClick={() => onRemoveYearTab(tab.id)}
+                    size="sm"
+                    variant="ghost"
+                    className="absolute top-1/2 -translate-y-1/2 right-1 h-4 w-4 p-0 hover:bg-red-100 hover:text-red-600 z-10"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </TabsList>
+        </Tabs>
+        <Separator className="my-3" />
+      </div>
+
+      {/* 각 년도별 컨텐츠 */}
+      <Tabs value={activeYearTab} onValueChange={onYearTabChange} className="w-full">
+        {yearTabs.map((tab) => (
+          <TabsContent key={tab.id} value={tab.id} className="space-y-6">
+            {tab.id === "overall" ? (
+              <OverallProcurementContent isActual={isActual} yearTabs={yearTabs} />
+            ) : (
+              <YearProcurementContent 
+                yearTab={tab} 
+                isActual={isActual}
+                months={months}
+                onAddMonth={onAddMonth}
+                onRemoveMonth={onRemoveMonth}
+                onUpdateMonthLabel={onUpdateMonthLabel}
+                onToggleMonthEdit={onToggleMonthEdit}
+              />
+            )}
+          </TabsContent>
+        ))}
+      </Tabs>
+    </>
+  )
+}
+
+// 전체 조달 컨텐츠 (연산으로 계산)
+interface OverallProcurementContentProps {
+  isActual: boolean
+  yearTabs: YearTab[]
+}
+
+function OverallProcurementContent({ isActual, yearTabs }: OverallProcurementContentProps) {
+  return (
+    <div className="space-y-6">
+      {/* 요약 카드 */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">총 조달 비용</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">-</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">총 조달 건수</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">-</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">평균 조달 단가</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">-</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 전체 조달 테이블 */}
+        <Card>
+        <CardHeader>
+          <CardTitle>전체 조달 현황</CardTitle>
+          <CardDescription>
+            {isActual ? "실제 " : ""}전체 기간의 조달 현황을 보여줍니다.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            <p>전체 조달 데이터는 각 년도별 데이터를 연산하여 계산됩니다.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+  )
+}
+
+// 년도별 조달 컨텐츠
+interface YearProcurementContentProps {
+  yearTab: YearTab
+  isActual: boolean
+  months: Array<{
+    key: string
+    label: string
+    value: string
+    month: number
+    year: number
+    isEditable: boolean
+  }>
+  onAddMonth: () => void
+  onRemoveMonth: (monthKey: string) => void
+  onUpdateMonthLabel: (monthKey: string, newLabel: string) => void
+  onToggleMonthEdit: (monthKey: string) => void
+}
+
+function YearProcurementContent({ 
+  yearTab, 
+  isActual, 
+  months, 
+  onAddMonth, 
+  onRemoveMonth, 
+  onUpdateMonthLabel, 
+  onToggleMonthEdit 
+}: YearProcurementContentProps) {
+  // 해당 년도의 월만 필터링
+  const yearMonths = months.filter(month => month.year === yearTab.year)
+
+  return (
+    <div className="space-y-6">
+      {/* 조달 관리 */}
+        <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>조달 관리 - {yearTab.name}</CardTitle>
+              <CardDescription>장비와 서비스를 조달합니다.</CardDescription>
+              </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={onAddMonth}
+                size="sm"
+                variant="outline"
+                className="h-8"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                월 추가
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            <Package className="w-16 h-16 mx-auto mb-4 opacity-50" />
+            <p className="text-lg font-medium mb-2">조달 관리 - {yearTab.name}</p>
+            <p>장비와 서비스 조달 정보를 관리할 수 있습니다.</p>
+            <p className="text-sm mt-2">현재 선택된 기간: {yearTab.name}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+  )
+}
+
+// 등급별 MM비용 모달 컴포넌트
+interface GradeCostModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  gradeCosts: Array<{ grade: string; cost: number }>
+  onGradeCostsChange: (costs: Array<{ grade: string; cost: number }>) => void
+}
+
+function GradeCostModal({ open, onOpenChange, gradeCosts, onGradeCostsChange }: GradeCostModalProps) {
+  const [tempCosts, setTempCosts] = useState(gradeCosts)
+
+  const handleSave = () => {
+    onGradeCostsChange(tempCosts)
+    onOpenChange(false)
+  }
+
+  const handleCancel = () => {
+    setTempCosts(gradeCosts)
+    onOpenChange(false)
+  }
+
+  const handleCostChange = (grade: string, cost: number) => {
+    setTempCosts(prev => prev.map(gc => gc.grade === grade ? { ...gc, cost } : gc))
+  }
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-96 max-h-[80vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">등급별 MM비용 설정</h2>
+          <Button
+            onClick={handleCancel}
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 p-0"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            각 등급별 월간 MM비용을 설정합니다. 이 값은 인건비 계산에 사용됩니다.
+          </p>
+          
+          <div className="space-y-3">
+            {tempCosts.map((grade) => (
+              <div key={grade.grade} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                  <span className="font-medium">{grade.grade}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={grade.cost}
+                    onChange={(e) => handleCostChange(grade.grade, Number(e.target.value))}
+                    className="w-24 px-2 py-1 text-sm text-right border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="입력"
+                  />
+                  <span className="text-sm text-muted-foreground">원</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button
+              onClick={handleCancel}
+              variant="outline"
+              size="sm"
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleSave}
+              size="sm"
+            >
+              저장
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// 년도 탭 삭제 확인 모달 컴포넌트
+function YearTabDeleteConfirmModal({ 
+  open, 
+  onOpenChange, 
+  yearTabName, 
+  onConfirm 
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  yearTabName: string
+  onConfirm: () => void
+}) {
+  const handleConfirm = () => {
+    onConfirm()
+    onOpenChange(false)
+  }
+
+  const handleCancel = () => {
+    onOpenChange(false)
+  }
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-96 max-h-[80vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-red-600">⚠️ 년도 탭 삭제 확인</h2>
+          <Button
+            onClick={handleCancel}
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 p-0"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        <div className="space-y-4">
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-800 font-medium mb-2">
+              다음 데이터가 영구적으로 삭제됩니다:
+            </p>
+            <ul className="text-sm text-red-700 space-y-1 ml-4">
+              <li>• {yearTabName} 손익계산서 데이터</li>
+              <li>• {yearTabName} 판관비 데이터</li>
+              <li>• {yearTabName} 조달 데이터</li>
+            </ul>
+          </div>
+          
+          <p className="text-sm text-gray-600">
+            이 작업은 되돌릴 수 없습니다. 정말로 삭제하시겠습니까?
+          </p>
+          
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button
+              onClick={handleCancel}
+              variant="outline"
+              size="sm"
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleConfirm}
+              size="sm"
+              className="bg-red-600 hover:bg-red-700"
+            >
+              삭제
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   )

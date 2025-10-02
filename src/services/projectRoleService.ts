@@ -210,21 +210,48 @@ export const canManageCostPermissions = async (projectId: string): Promise<boole
 
     console.log('✅ 사용자 인증 확인:', { userId: user.id })
 
-    // 단순화: 프로젝트 생성자만 권한 관리 허용 (localStorage 확인)
-    const savedOpenProject = localStorage.getItem('openProject')
-    if (savedOpenProject) {
-      const project = JSON.parse(savedOpenProject)
-      if (project.created_by === user.id) {
-        console.log('✅ 프로젝트 생성자로 권한 관리 허용 (localStorage 확인)')
-        return true
-      } else {
-        console.log('❌ 프로젝트 생성자가 아님 - 권한 관리 거부')
-        return false
-      }
-    } else {
-      console.log('❌ 프로젝트 정보 없음 - 권한 관리 거부')
+    // 데이터베이스에서 프로젝트 정보 직접 조회
+    const { data: project, error } = await supabase
+      .from('projects')
+      .select('created_by, group_id')
+      .eq('id', projectId)
+      .single()
+
+    if (error) {
+      console.error('❌ 프로젝트 조회 실패:', error)
       return false
     }
+
+    if (!project) {
+      console.log('❌ 프로젝트를 찾을 수 없음')
+      return false
+    }
+
+    console.log('✅ 프로젝트 정보 조회 성공:', project)
+
+    // 프로젝트 생성자인지 확인
+    if (project.created_by === user.id) {
+      console.log('✅ 프로젝트 생성자로 권한 관리 허용')
+      return true
+    }
+
+    // 프로젝트가 속한 기업의 owner인지 확인
+    if (project.group_id) {
+      const { data: companyMember } = await supabase
+        .from('company_members')
+        .select('user_role')
+        .eq('group_id', project.group_id)
+        .eq('user_id', user.id)
+        .single()
+
+      if (companyMember && companyMember.user_role === 'owner') {
+        console.log('✅ 기업 owner로 권한 관리 허용')
+        return true
+      }
+    }
+
+    console.log('❌ 권한 없음 - 프로젝트 생성자도 기업 owner도 아님')
+    return false
   } catch (error) {
     console.error('❌ 비용 관리 권한 확인 중 오류:', error)
     return false

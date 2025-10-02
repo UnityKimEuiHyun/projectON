@@ -6,11 +6,20 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import TaskDetailModal, { WBSTask as TaskDetailWBSTask } from "@/components/TaskDetailModal"
 import { BarChart3, Plus, Edit, Trash2, ChevronDown, ChevronRight, Calendar, User, Table, GanttChart, Filter, Download, Search, Minus, Plus as PlusIcon, UserPlus, Building2, Workflow, Target, FolderOpen, List, Check, Upload, File, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getCompanyMembers, getUserCompanies, type CompanyMember } from "@/services/companyService"
 import { ProjectService } from "@/services/projectService"
+import { format } from "date-fns"
+import { ko } from "date-fns/locale"
+
+// 날짜 포맷팅 함수
+const formatDate = (date: Date) => {
+  return format(date, "yyyy-MM-dd")
+}
 
 // 드롭다운 스타일을 위한 CSS
 const dropdownStyles = `
@@ -1529,7 +1538,7 @@ export default function WBSManagement() {
         </div>
         
         {/* 상태 */}
-        <div className="w-28 flex items-center">
+        <div className="w-32 flex items-center px-2">
           <select
             value={task.status}
             onChange={(e) => {
@@ -1552,487 +1561,27 @@ export default function WBSManagement() {
         </div>
         
         {/* 시작일 */}
-        <div className="flex-1 flex items-center gap-1">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-          <div className="flex items-center gap-0 relative">
-            {/* YYYY */}
-            {[0, 1, 2, 3].map(pos => (
+        <div className="w-32 px-2">
               <input
-                key={pos}
-                type="text"
-                maxLength={1}
-                value={dateInputs[`${task.id}-startDate-${pos}`] || ''}
-                onClick={(e) => {
-                  const target = e.target as HTMLInputElement
-                  target.focus()
-                  target.select()
-                }}
-                onChange={(e) => {
-                  const target = e.target as HTMLInputElement
-                  const value = target.value.replace(/[^0-9]/g, '')
-                  handleDateInput(task.id, 'startDate', pos, value, target)
-                }}
-                onInput={(e) => {
-                  const target = e.target as HTMLInputElement
-                  const value = target.value.replace(/[^0-9]/g, '')
-                  handleDateInput(task.id, 'startDate', pos, value, target)
-                  // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
-                  if (value && pos < 7) {
-                    setTimeout(() => {
-                      // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
-                      const dateContainer = target.closest('.flex.items-center.gap-0')
-                      const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                      const currentIndex = Array.from(allInputs).indexOf(target)
-                      const nextInput = allInputs[currentIndex + 1]
-                      if (nextInput) {
-                        nextInput.focus()
-                        nextInput.select()
-                      }
-                    }, 0)
-                  }
-                }}
-                onKeyDown={(e) => {
-                  const target = e.target as HTMLInputElement
-                  if (e.key === 'Backspace' && !target.value && pos > 0) {
-                    // 이전 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const prevInput = allInputs[currentIndex - 1]
-                    if (prevInput) {
-                      prevInput.focus()
-                      prevInput.select()
-                    }
-                  } else if (e.key === 'ArrowLeft' && pos > 0) {
-                    // 왼쪽 화살표: 이전 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const prevInput = allInputs[currentIndex - 1]
-                    if (prevInput) {
-                      prevInput.focus()
-                      prevInput.select()
-                    }
-                  } else if (e.key === 'ArrowRight' && pos < 7) {
-                    // 오른쪽 화살표: 다음 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const nextInput = allInputs[currentIndex + 1]
-                    if (nextInput) {
-                      nextInput.focus()
-                      nextInput.select()
-                    }
-                  }
-                }}
-                className="w-2 h-6 text-center text-xs font-mono p-0 relative z-10"
-                placeholder={pos === 0 ? 'Y' : pos === 1 ? 'Y' : pos === 2 ? 'Y' : pos === 3 ? 'Y' : pos === 4 ? 'M' : pos === 5 ? 'M' : pos === 6 ? 'D' : pos === 7 ? 'D' : ''}
-              />
-            ))}
-            <span className="text-gray-400">-</span>
-            {/* MM */}
-            {[4, 5].map(pos => (
-              <input
-                key={pos}
-                type="text"
-                maxLength={1}
-                value={dateInputs[`${task.id}-startDate-${pos}`] || ''}
-                onClick={(e) => {
-                  const target = e.target as HTMLInputElement
-                  target.focus()
-                  target.select()
-                }}
-                onChange={(e) => {
-                  const target = e.target as HTMLInputElement
-                  const value = target.value.replace(/[^0-9]/g, '')
-                  handleDateInput(task.id, 'startDate', pos, value, target)
-                }}
-                onInput={(e) => {
-                  const target = e.target as HTMLInputElement
-                  const value = target.value.replace(/[^0-9]/g, '')
-                  handleDateInput(task.id, 'startDate', pos, value, target)
-                  // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
-                  if (value && pos < 7) {
-                    setTimeout(() => {
-                      // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
-                      const dateContainer = target.closest('.flex.items-center.gap-0')
-                      const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                      const currentIndex = Array.from(allInputs).indexOf(target)
-                      const nextInput = allInputs[currentIndex + 1]
-                      if (nextInput) {
-                        nextInput.focus()
-                        nextInput.select()
-                      }
-                    }, 0)
-                  }
-                }}
-                onKeyDown={(e) => {
-                  const target = e.target as HTMLInputElement
-                  if (e.key === 'Backspace' && !target.value && pos > 0) {
-                    // 이전 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const prevInput = allInputs[currentIndex - 1]
-                    if (prevInput) {
-                      prevInput.focus()
-                      prevInput.select()
-                    }
-                  } else if (e.key === 'ArrowLeft' && pos > 0) {
-                    // 왼쪽 화살표: 이전 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const prevInput = allInputs[currentIndex - 1]
-                    if (prevInput) {
-                      prevInput.focus()
-                      prevInput.select()
-                    }
-                  } else if (e.key === 'ArrowRight' && pos < 7) {
-                    // 오른쪽 화살표: 다음 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const nextInput = allInputs[currentIndex + 1]
-                    if (nextInput) {
-                      nextInput.focus()
-                      nextInput.select()
-                    }
-                  }
-                }}
-                className="w-2 h-6 text-center text-xs font-mono p-0 relative z-10"
-                placeholder={pos === 0 ? 'Y' : pos === 1 ? 'Y' : pos === 2 ? 'Y' : pos === 3 ? 'Y' : pos === 4 ? 'M' : pos === 5 ? 'M' : pos === 6 ? 'D' : pos === 7 ? 'D' : ''}
-              />
-            ))}
-            <span className="text-gray-400">-</span>
-            {/* DD */}
-            {[6, 7].map(pos => (
-              <input
-                key={pos}
-                type="text"
-                maxLength={1}
-                value={dateInputs[`${task.id}-startDate-${pos}`] || ''}
-                onClick={(e) => {
-                  const target = e.target as HTMLInputElement
-                  target.focus()
-                  target.select()
-                }}
-                onChange={(e) => {
-                  const target = e.target as HTMLInputElement
-                  const value = target.value.replace(/[^0-9]/g, '')
-                  handleDateInput(task.id, 'startDate', pos, value, target)
-                }}
-                onInput={(e) => {
-                  const target = e.target as HTMLInputElement
-                  const value = target.value.replace(/[^0-9]/g, '')
-                  handleDateInput(task.id, 'startDate', pos, value, target)
-                  // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
-                  if (value && pos < 7) {
-                    setTimeout(() => {
-                      // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
-                      const dateContainer = target.closest('.flex.items-center.gap-0')
-                      const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                      const currentIndex = Array.from(allInputs).indexOf(target)
-                      const nextInput = allInputs[currentIndex + 1]
-                      if (nextInput) {
-                        nextInput.focus()
-                        nextInput.select()
-                      }
-                    }, 0)
-                  }
-                }}
-                onKeyDown={(e) => {
-                  const target = e.target as HTMLInputElement
-                  if (e.key === 'Backspace' && !target.value && pos > 0) {
-                    // 이전 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const prevInput = allInputs[currentIndex - 1]
-                    if (prevInput) {
-                      prevInput.focus()
-                      prevInput.select()
-                    }
-                  } else if (e.key === 'ArrowLeft' && pos > 0) {
-                    // 왼쪽 화살표: 이전 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const prevInput = allInputs[currentIndex - 1]
-                    if (prevInput) {
-                      prevInput.focus()
-                      prevInput.select()
-                    }
-                  } else if (e.key === 'ArrowRight' && pos < 7) {
-                    // 오른쪽 화살표: 다음 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const nextInput = allInputs[currentIndex + 1]
-                    if (nextInput) {
-                      nextInput.focus()
-                      nextInput.select()
-                    }
-                  }
-                }}
-                className="w-2 h-6 text-center text-xs font-mono p-0 relative z-10"
-                placeholder={pos === 6 ? 'D' : pos === 7 ? 'D' : ''}
-              />
-            ))}
-          </div>
+            type="date"
+            value={task.startDate}
+            onChange={(e) => updateTaskDate(task.id, 'startDate', e.target.value)}
+            className="w-full h-6 px-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+          />
             </div>
             
         {/* 종료일 */}
-        <div className="flex-1 flex items-center gap-1">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-          <div className="flex items-center gap-0 relative">
-            {/* YYYY */}
-            {[0, 1, 2, 3].map(pos => (
+        <div className="w-32 px-2">
               <input
-                key={pos}
-                type="text"
-                maxLength={1}
-                value={dateInputs[`${task.id}-endDate-${pos}`] || ''}
-                onClick={(e) => {
-                  const target = e.target as HTMLInputElement
-                  target.focus()
-                  target.select()
-                }}
-                onChange={(e) => {
-                  const target = e.target as HTMLInputElement
-                  const value = target.value.replace(/[^0-9]/g, '')
-                  handleDateInput(task.id, 'endDate', pos, value, target)
-                }}
-                onInput={(e) => {
-                  const target = e.target as HTMLInputElement
-                  const value = target.value.replace(/[^0-9]/g, '')
-                  handleDateInput(task.id, 'endDate', pos, value, target)
-                  // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
-                  if (value && pos < 7) {
-                    setTimeout(() => {
-                      // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
-                      const dateContainer = target.closest('.flex.items-center.gap-0')
-                      const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                      const currentIndex = Array.from(allInputs).indexOf(target)
-                      const nextInput = allInputs[currentIndex + 1]
-                      if (nextInput) {
-                        nextInput.focus()
-                        nextInput.select()
-                      }
-                    }, 0)
-                  }
-                }}
-                onKeyDown={(e) => {
-                  const target = e.target as HTMLInputElement
-                  if (e.key === 'Backspace' && !target.value && pos > 0) {
-                    // 이전 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const prevInput = allInputs[currentIndex - 1]
-                    if (prevInput) {
-                      prevInput.focus()
-                      prevInput.select()
-                    }
-                  } else if (e.key === 'ArrowLeft' && pos > 0) {
-                    // 왼쪽 화살표: 이전 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const prevInput = allInputs[currentIndex - 1]
-                    if (prevInput) {
-                      prevInput.focus()
-                      prevInput.select()
-                    }
-                  } else if (e.key === 'ArrowRight' && pos < 7) {
-                    // 오른쪽 화살표: 다음 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const nextInput = allInputs[currentIndex + 1]
-                    if (nextInput) {
-                      nextInput.focus()
-                      nextInput.select()
-                    }
-                  }
-                }}
-                className="w-2 h-6 text-center text-xs font-mono p-0 relative z-10"
-                placeholder={pos === 0 ? 'Y' : pos === 1 ? 'Y' : pos === 2 ? 'Y' : pos === 3 ? 'Y' : pos === 4 ? 'M' : pos === 5 ? 'M' : pos === 6 ? 'D' : pos === 7 ? 'D' : ''}
-              />
-            ))}
-            <span className="text-gray-400">-</span>
-            {/* MM */}
-            {[4, 5].map(pos => (
-              <input
-                key={pos}
-                type="text"
-                maxLength={1}
-                value={dateInputs[`${task.id}-endDate-${pos}`] || ''}
-                onClick={(e) => {
-                  const target = e.target as HTMLInputElement
-                  target.focus()
-                  target.select()
-                }}
-                onChange={(e) => {
-                  const target = e.target as HTMLInputElement
-                  const value = target.value.replace(/[^0-9]/g, '')
-                  handleDateInput(task.id, 'endDate', pos, value, target)
-                }}
-                onInput={(e) => {
-                  const target = e.target as HTMLInputElement
-                  const value = target.value.replace(/[^0-9]/g, '')
-                  handleDateInput(task.id, 'endDate', pos, value, target)
-                  // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
-                  if (value && pos < 7) {
-                    setTimeout(() => {
-                      // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
-                      const dateContainer = target.closest('.flex.items-center.gap-0')
-                      const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                      const currentIndex = Array.from(allInputs).indexOf(target)
-                      const nextInput = allInputs[currentIndex + 1]
-                      if (nextInput) {
-                        nextInput.focus()
-                        nextInput.select()
-                      }
-                    }, 0)
-                  }
-                }}
-                onKeyDown={(e) => {
-                  const target = e.target as HTMLInputElement
-                  if (e.key === 'Backspace' && !target.value && pos > 0) {
-                    // 이전 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const prevInput = allInputs[currentIndex - 1]
-                    if (prevInput) {
-                      prevInput.focus()
-                      prevInput.select()
-                    }
-                  } else if (e.key === 'ArrowLeft' && pos > 0) {
-                    // 왼쪽 화살표: 이전 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const prevInput = allInputs[currentIndex - 1]
-                    if (prevInput) {
-                      prevInput.focus()
-                      prevInput.select()
-                    }
-                  } else if (e.key === 'ArrowRight' && pos < 7) {
-                    // 오른쪽 화살표: 다음 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const nextInput = allInputs[currentIndex + 1]
-                    if (nextInput) {
-                      nextInput.focus()
-                      nextInput.select()
-                    }
-                  }
-                }}
-                className="w-2 h-6 text-center text-xs font-mono p-0 relative z-10"
-                placeholder={pos === 0 ? 'Y' : pos === 1 ? 'Y' : pos === 2 ? 'Y' : pos === 3 ? 'Y' : pos === 4 ? 'M' : pos === 5 ? 'M' : pos === 6 ? 'D' : pos === 7 ? 'D' : ''}
-              />
-            ))}
-            <span className="text-gray-400">-</span>
-            {/* DD */}
-            {[6, 7].map(pos => (
-              <input
-                key={pos}
-                type="text"
-                maxLength={1}
-                value={dateInputs[`${task.id}-endDate-${pos}`] || ''}
-                onClick={(e) => {
-                  const target = e.target as HTMLInputElement
-                  target.focus()
-                  target.select()
-                }}
-                onChange={(e) => {
-                  const target = e.target as HTMLInputElement
-                  const value = target.value.replace(/[^0-9]/g, '')
-                  handleDateInput(task.id, 'endDate', pos, value, target)
-                }}
-                onInput={(e) => {
-                  const target = e.target as HTMLInputElement
-                  const value = target.value.replace(/[^0-9]/g, '')
-                  handleDateInput(task.id, 'endDate', pos, value, target)
-                  // 숫자 입력 시 다음 칸으로 포커스 이동 (YYYY→MM, MM→DD)
-                  if (value && pos < 7) {
-                    setTimeout(() => {
-                      // 현재 날짜 필드의 부모 컨테이너에서 다음 입력 필드 찾기
-                      const dateContainer = target.closest('.flex.items-center.gap-0')
-                      const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                      const currentIndex = Array.from(allInputs).indexOf(target)
-                      const nextInput = allInputs[currentIndex + 1]
-                      if (nextInput) {
-                        nextInput.focus()
-                        nextInput.select()
-                      }
-                    }, 0)
-                  }
-                }}
-                onKeyDown={(e) => {
-                  const target = e.target as HTMLInputElement
-                  if (e.key === 'Backspace' && !target.value && pos > 0) {
-                    // 이전 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const prevInput = allInputs[currentIndex - 1]
-                    if (prevInput) {
-                      prevInput.focus()
-                      prevInput.select()
-                    }
-                  } else if (e.key === 'ArrowLeft' && pos > 0) {
-                    // 왼쪽 화살표: 이전 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const prevInput = allInputs[currentIndex - 1]
-                    if (prevInput) {
-                      prevInput.focus()
-                      prevInput.select()
-                    }
-                  } else if (e.key === 'ArrowRight' && pos < 7) {
-                    // 오른쪽 화살표: 다음 자리로 이동
-                    e.preventDefault()
-                    const dateContainer = target.closest('.flex.items-center.gap-0')
-                    const allInputs = dateContainer?.querySelectorAll('input[type="text"]') as NodeListOf<HTMLInputElement>
-                    const currentIndex = Array.from(allInputs).indexOf(target)
-                    const nextInput = allInputs[currentIndex + 1]
-                    if (nextInput) {
-                      nextInput.focus()
-                      nextInput.select()
-                    }
-                  }
-                }}
-                className="w-2 h-6 text-center text-xs font-mono p-0 relative z-10"
-                placeholder={pos === 6 ? 'D' : pos === 7 ? 'D' : ''}
-              />
-            ))}
-          </div>
+            type="date"
+            value={task.endDate}
+            onChange={(e) => updateTaskDate(task.id, 'endDate', e.target.value)}
+            className="w-full h-6 px-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+          />
             </div>
             
         {/* 담당자 */}
-        <div className="flex-1 flex items-center">
+        <div className="w-32 flex items-center px-2">
           <Button
             variant="outline"
             size="sm"
@@ -2046,7 +1595,7 @@ export default function WBSManagement() {
         </div>
 
         {/* 최종 산출물 */}
-        <div className="w-32 flex items-center">
+        <div className="flex-1 flex items-center">
           <Button
             variant="outline"
             size="sm"
@@ -2206,16 +1755,6 @@ export default function WBSManagement() {
           </div>
           </div>
 
-      {/* 현재 프로젝트 */}
-      {activeProject && (
-        <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
-          <Target className="w-5 h-5 text-primary" />
-          <div>
-            <span className="text-sm text-muted-foreground">현재 프로젝트:</span>
-            <span className="ml-2 text-lg font-semibold">{activeProject.name}</span>
-          </div>
-        </div>
-      )}
 
       {/* 통계 정보 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -2284,11 +1823,11 @@ export default function WBSManagement() {
                 <div className="w-[12px]"></div>
                 <div className="w-[300px]">작업명</div>
                 <div className="flex-1">진행률</div>
-                <div className="w-28">상태</div>
-                <div className="flex-1">시작일</div>
-                <div className="flex-1">종료일</div>
-                <div className="flex-1">담당자</div>
-                <div className="w-32">최종 산출물</div>
+                <div className="w-32 text-center">상태</div>
+                <div className="w-32 text-center">시작일</div>
+                <div className="w-32 text-center">종료일</div>
+                <div className="w-32 text-center">담당자</div>
+                <div className="flex-1 text-center">최종 산출물</div>
               </div>
 
               {/* 작업 목록 */}
@@ -2523,49 +2062,49 @@ export default function WBSManagement() {
               <div className="p-4 bg-gray-50 rounded-lg">
                 <h4 className="text-sm font-medium text-gray-700 mb-3">Lv1 작업 유형별 색상 구분</h4>
                 <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: '#3b82f6' }}></div>
                     <span className="text-sm">1. 프로젝트 기획 (Lv1)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
+                </div>
+                <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: '#93c5fd' }}></div>
                     <span className="text-sm">1. 프로젝트 기획 (Lv2)</span>
-                  </div>
+                </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: '#dbeafe' }}></div>
                     <span className="text-sm">1. 프로젝트 기획 (Lv3)</span>
-                  </div>
+              </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: '#10b981' }}></div>
                     <span className="text-sm">2. 디자인 (Lv1)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
+            </div>
+                <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: '#6ee7b7' }}></div>
                     <span className="text-sm">2. 디자인 (Lv2)</span>
-                  </div>
+                </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: '#a7f3d0' }}></div>
                     <span className="text-sm">2. 디자인 (Lv3)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
+              </div>
+                <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: '#f59e0b' }}></div>
                     <span className="text-sm">3. 개발 (Lv1)</span>
-                  </div>
+                </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: '#fcd34d' }}></div>
                     <span className="text-sm">3. 개발 (Lv2)</span>
-                  </div>
+              </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded" style={{ backgroundColor: '#fde68a' }}></div>
                     <span className="text-sm">3. 개발 (Lv3)</span>
-                  </div>
-                </div>
+            </div>
+                      </div>
                 <div className="mt-3 text-xs text-gray-500">
                   <p>• 각 Lv1 작업 유형 내에서 Lv2는 중간 색상, Lv3는 연한 색상으로 표시됩니다.</p>
+                        </div>
+                      </div>
                 </div>
-              </div>
-            </div>
-          )}
+              )}
         </CardContent>
       </Card>
 
@@ -2622,7 +2161,7 @@ export default function WBSManagement() {
               >
                 파일 선택
               </Button>
-            </div>
+              </div>
 
             {/* 업로드된 파일 목록 */}
             {(() => {
@@ -2633,7 +2172,7 @@ export default function WBSManagement() {
                 return (
                   <div className="text-center py-8 text-gray-500">
                     업로드된 산출물이 없습니다.
-                  </div>
+                      </div>
                 )
               }
 
@@ -2649,8 +2188,8 @@ export default function WBSManagement() {
                       <Download className="w-4 h-4 mr-1" />
                       모두 다운로드
                     </Button>
-                  </div>
-                  
+              </div>
+
                   <div className="max-h-60 overflow-y-auto space-y-2">
                     {deliverables.map((deliverable) => (
                       <div
@@ -2666,9 +2205,9 @@ export default function WBSManagement() {
                             <p className="text-xs text-gray-500">
                               {(deliverable.size / 1024).toFixed(1)} KB
                             </p>
-                          </div>
-                        </div>
-                        
+                </div>
+              </div>
+
                         <div className="flex items-center space-x-2">
                           <Button
                             variant="ghost"
@@ -2692,7 +2231,7 @@ export default function WBSManagement() {
                 </div>
               )
             })()}
-          </div>
+            </div>
         </DialogContent>
       </Dialog>
 

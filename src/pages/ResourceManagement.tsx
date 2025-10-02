@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import TaskDetailModal, { WBSTask as TaskDetailWBSTask } from "@/components/TaskDetailModal"
+import { supabase } from "@/integrations/supabase/client"
 import { 
   UserCheck, 
   Clock, 
@@ -63,10 +64,21 @@ const ResourceManagement = () => {
   const [wbsTasks, setWbsTasks] = useState<WBSTask[]>([])
   const [expandedMembers, setExpandedMembers] = useState<Set<string>>(new Set())
   
+  // 역할 편집 상태 관리
+  const [editingRole, setEditingRole] = useState<string | null>(null)
+  const [tempRoleValue, setTempRoleValue] = useState<string>('')
+  
   // 작업 상세 모달 상태
   const [taskDetailModalOpen, setTaskDetailModalOpen] = useState(false)
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<WBSTask | null>(null)
   useEffect(() => {
+    console.log('🚀 리소스 관리 useEffect 실행 - user:', user)
+    loadActiveProject()
+  }, [user])
+
+  // 초기 마운트 시에도 실행
+  useEffect(() => {
+    console.log('🚀 리소스 관리 초기 마운트 useEffect 실행')
     loadActiveProject()
   }, [])
 
@@ -96,17 +108,50 @@ const ResourceManagement = () => {
   }, [location.pathname])
 
   const loadActiveProject = async () => {
+    console.log('🔍 리소스 관리 - loadActiveProject 시작')
+    console.log('👤 user:', user)
+    
+    if (!user) {
+      console.log('❌ 사용자가 로그인되지 않음')
+      return
+    }
+    
     try {
       setIsLoading(true)
+      
       const savedOpenProject = localStorage.getItem('openProject')
+      console.log('💾 localStorage openProject:', savedOpenProject)
+      
       if (savedOpenProject) {
         const project = JSON.parse(savedOpenProject)
+        console.log('✅ localStorage에서 프로젝트 로드 성공:', project)
         setActiveProject(project)
+      } else {
+        console.log('⚠️ localStorage에 프로젝트 없음, DB에서 첫 번째 프로젝트 로드 시도')
+        // 활성화된 프로젝트가 없으면 첫 번째 프로젝트 로드
+        const { data, error } = await supabase
+          .from('projects')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (error) {
+          console.error('❌ 프로젝트 로드 실패:', error)
+          return
+        }
+
+        if (data && data.length > 0) {
+          console.log('✅ DB에서 첫 번째 프로젝트 로드 성공:', data[0])
+          setActiveProject(data[0])
+        } else {
+          console.log('❌ DB에 프로젝트가 없음')
+        }
       }
     } catch (error) {
-      console.error('프로젝트 로드 실패:', error)
+      console.error('❌ 프로젝트 로드 중 오류:', error)
     } finally {
       setIsLoading(false)
+      console.log('🏁 loadActiveProject 완료, isLoading:', false)
     }
   }
 
@@ -1013,6 +1058,60 @@ const ResourceManagement = () => {
     console.log(`리소스 ${allocationId}의 상태가 ${statusText}로 변경되었습니다.`)
   }
 
+  // 날짜 업데이트 함수
+  const updateAllocationDate = (allocationId: string, field: 'startDate' | 'endDate', newDate: string) => {
+    setResourceAllocations(prev => 
+      prev.map(allocation => 
+        allocation.id === allocationId 
+          ? { ...allocation, [field]: newDate }
+          : allocation
+      )
+    )
+  }
+
+  // 상주 유형 업데이트 함수
+  const updateAllocationWorkType = (allocationId: string, newWorkType: 'full-time' | 'part-time' | 'remote') => {
+    setResourceAllocations(prev => 
+      prev.map(allocation => 
+        allocation.id === allocationId 
+          ? { ...allocation, workType: newWorkType }
+          : allocation
+      )
+    )
+  }
+
+  // 역할 편집 시작
+  const startEditingRole = (allocationId: string, currentRole: string) => {
+    setEditingRole(allocationId)
+    setTempRoleValue(currentRole)
+  }
+
+  // 역할 편집 완료
+  const finishEditingRole = (allocationId: string) => {
+    if (tempRoleValue.trim()) {
+      updateAllocationRole(allocationId, tempRoleValue.trim())
+    }
+    setEditingRole(null)
+    setTempRoleValue('')
+  }
+
+  // 역할 편집 취소
+  const cancelEditingRole = () => {
+    setEditingRole(null)
+    setTempRoleValue('')
+  }
+
+  // 역할 업데이트 함수
+  const updateAllocationRole = (allocationId: string, newRole: string) => {
+    setResourceAllocations(prev => 
+      prev.map(allocation => 
+        allocation.id === allocationId 
+          ? { ...allocation, memberRole: newRole }
+          : allocation
+      )
+    )
+  }
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high': return 'bg-red-100 text-red-800'
@@ -1044,13 +1143,41 @@ const ResourceManagement = () => {
     )
   }
 
+  // 디버깅 로그
+  console.log('🔍 리소스 관리 렌더링 상태:')
+  console.log('  - isLoading:', isLoading)
+  console.log('  - activeProject:', activeProject)
+  console.log('  - user:', user)
+
+  // 로딩 상태
+  if (isLoading) {
+    console.log('⏳ 로딩 상태 표시')
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <UserCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4 animate-pulse" />
+          <h3 className="text-lg font-semibold mb-2">로딩 중...</h3>
+          <p className="text-muted-foreground">프로젝트 정보를 불러오는 중입니다.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 프로젝트가 없는 경우
   if (!activeProject) {
+    console.log('❌ 프로젝트 없음 상태 표시')
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <UserCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">활성화된 프로젝트가 없습니다</h3>
           <p className="text-muted-foreground">프로젝트를 선택한 후 리소스 관리를 이용하세요.</p>
+          <div className="mt-4 text-xs text-muted-foreground">
+            <p>디버깅 정보:</p>
+            <p>isLoading: {isLoading.toString()}</p>
+            <p>activeProject: {activeProject ? '있음' : '없음'}</p>
+            <p>user: {user ? '로그인됨' : '로그인 안됨'}</p>
+          </div>
         </div>
       </div>
     )
@@ -1059,18 +1186,12 @@ const ResourceManagement = () => {
   return (
     <div className="p-6 space-y-6">
       {/* 헤더 */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <UserCheck className="w-8 h-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">리소스 관리</h1>
-            <p className="text-muted-foreground">프로젝트 구성원의 투입/철수 일정과 주요 업무를 관리합니다.</p>
-          </div>
+      <div className="flex items-center gap-3 mb-6">
+        <UserCheck className="w-8 h-8 text-primary" />
+        <div>
+          <h1 className="text-3xl font-bold">리소스 관리</h1>
+          <p className="text-muted-foreground">프로젝트 구성원의 투입/철수 일정과 주요 업무를 관리합니다.</p>
         </div>
-        <Button>
-          <Plus className="w-4 h-4 mr-2" />
-          리소스 할당
-        </Button>
       </div>
 
 
@@ -1092,20 +1213,23 @@ const ResourceManagement = () => {
                 <div className="text-sm text-muted-foreground">현재 투입</div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="text-xl font-bold text-yellow-600">
-                  {resourceAllocations.filter(r => r.status === 'planned').length}
+                <div className="text-xl font-bold text-gray-600">
+                  {resourceAllocations.filter(r => r.status === 'planned' || r.status === 'cancelled').length}
                 </div>
-                <div className="text-sm text-muted-foreground">투입 예정</div>
+                <div className="text-sm text-muted-foreground">현재 미투입</div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="text-xl font-bold text-gray-600">
-                  {resourceAllocations.filter(r => r.status === 'completed').length}
+                <div className="text-xl font-bold text-yellow-600">
+                  {resourceAllocations.filter(r => r.status === 'deployment_requested').length}
                 </div>
-                <div className="text-sm text-muted-foreground">철수 완료</div>
+                <div className="text-sm text-muted-foreground">투입 요청</div>
               </div>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              현재 투입 인원 현황
+              <div className="flex items-center gap-2">
+                <div className="text-xl font-bold text-red-600">
+                  {resourceAllocations.filter(r => r.status === 'withdrawal_requested').length}
+                </div>
+                <div className="text-sm text-muted-foreground">철수 요청</div>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -1143,19 +1267,65 @@ const ResourceManagement = () => {
                         <span className="font-medium">{allocation.memberName}</span>
                       </div>
                     </td>
-                    <td className="p-3 text-sm text-muted-foreground">
-                      {allocation.memberRole}
+                    <td className="p-3">
+                      {editingRole === allocation.id ? (
+                        <input
+                          type="text"
+                          value={tempRoleValue}
+                          onChange={(e) => setTempRoleValue(e.target.value)}
+                          onBlur={() => finishEditingRole(allocation.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              finishEditingRole(allocation.id)
+                            } else if (e.key === 'Escape') {
+                              cancelEditingRole()
+                            }
+                          }}
+                          placeholder="역할을 입력하세요"
+                          className="w-full h-8 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white box-border"
+                          autoFocus
+                        />
+                      ) : (
+                        <div
+                          className="w-full h-8 px-2 text-sm border border-gray-300 rounded cursor-pointer hover:bg-gray-50 hover:border-blue-500 flex items-center box-border"
+                          onClick={() => startEditingRole(allocation.id, allocation.memberRole)}
+                        >
+                          {allocation.memberRole || '역할을 입력하세요'}
+                        </div>
+                      )}
                     </td>
                     <td className="p-3">
-                      <Badge className={getWorkTypeColor(allocation.workType)}>
-                        {getWorkTypeText(allocation.workType)}
-                      </Badge>
+                      <select
+                        value={allocation.workType}
+                        onChange={(e) => updateAllocationWorkType(allocation.id, e.target.value as 'full-time' | 'part-time' | 'remote')}
+                        className="w-full h-8 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      >
+                        <option value="full-time">상주</option>
+                        <option value="part-time">부분상주</option>
+                        <option value="remote">비상주</option>
+                      </select>
                     </td>
-                    <td className="p-3 text-sm">
-                      {allocation.startDate}
+                    <td className="p-3 w-40">
+                      <input
+                        type="date"
+                        value={allocation.startDate}
+                        onChange={(e) => updateAllocationDate(allocation.id, 'startDate', e.target.value)}
+                        disabled={allocation.workType === 'remote'}
+                        className={`w-full h-8 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+                          allocation.workType === 'remote' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white'
+                        }`}
+                      />
                     </td>
-                    <td className="p-3 text-sm">
-                      {allocation.endDate}
+                    <td className="p-3 w-40">
+                      <input
+                        type="date"
+                        value={allocation.endDate}
+                        onChange={(e) => updateAllocationDate(allocation.id, 'endDate', e.target.value)}
+                        disabled={allocation.workType === 'remote'}
+                        className={`w-full h-8 px-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+                          allocation.workType === 'remote' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white'
+                        }`}
+                      />
                     </td>
                     <td className="p-3">
                       <div className="space-y-1">
